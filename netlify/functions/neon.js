@@ -40,15 +40,18 @@ exports.handler = async (event) => {
       data_teste TIMESTAMP DEFAULT NOW()
     )`;
 
-    let result;
+    // Execute query with tagged template (works for all cases)
+    let rows = [];
     if (params && params.length > 0) {
-      result = await sql(query, params);
+      // Build tagged template dynamically using neon's query method
+      const result = await sql(query, params);
+      rows = Array.isArray(result) ? result : [];
     } else {
-      result = await sql.query(query);
+      const result = await sql`${neon.unsafe(query)}`;
+      rows = Array.isArray(result) ? result : [];
     }
 
-    const rows = Array.isArray(result) ? result : (result.rows || []);
-    const command = result.command || (query.trim().toUpperCase().startsWith('INSERT') ? 'INSERT' : 'SELECT');
+    const command = query.trim().toUpperCase().startsWith('INSERT') ? 'INSERT' : 'SELECT';
 
     return {
       statusCode: 200,
