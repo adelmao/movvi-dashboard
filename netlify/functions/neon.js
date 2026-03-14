@@ -23,35 +23,24 @@ exports.handler = async (event) => {
     const { query, params } = JSON.parse(event.body || '{}');
 
     if (!query) {
-      return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'No query provided' }) };
+      return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'No query' }) };
     }
 
-    // Create table if needed
-    await sql`CREATE TABLE IF NOT EXISTS quiz_resultados (
-      id SERIAL PRIMARY KEY,
-      motorista_nome TEXT,
-      motorista_id TEXT,
-      telefone TEXT,
-      cidade TEXT,
-      plataforma TEXT,
-      pontuacao INTEGER,
-      total_perguntas INTEGER,
-      percentagem NUMERIC(5,2),
-      data_teste TIMESTAMP DEFAULT NOW()
-    )`;
-
-    // Execute query with tagged template (works for all cases)
+    // Use neon's tagged template with unsafe for raw SQL
+    // This is the correct API for @neondatabase/serverless
     let rows = [];
+
     if (params && params.length > 0) {
-      // Build tagged template dynamically using neon's query method
-      const result = await sql(query, params);
-      rows = Array.isArray(result) ? result : [];
+      // Parameterized query
+      rows = await sql(query, params);
     } else {
-      const result = await sql`${neon.unsafe(query)}`;
-      rows = Array.isArray(result) ? result : [];
+      // Raw query - neon tagged template
+      rows = await sql([query]);
     }
 
-    const command = query.trim().toUpperCase().startsWith('INSERT') ? 'INSERT' : 'SELECT';
+    rows = Array.isArray(rows) ? rows : [];
+    const command = query.trim().toUpperCase().startsWith('INSERT') ? 'INSERT' :
+                    query.trim().toUpperCase().startsWith('CREATE') ? 'CREATE' : 'SELECT';
 
     return {
       statusCode: 200,
@@ -59,7 +48,7 @@ exports.handler = async (event) => {
       body: JSON.stringify({ rows, command, rowCount: rows.length })
     };
   } catch (e) {
-    console.error('Neon error:', e.message);
+    console.error('Error:', e.message);
     return {
       statusCode: 500,
       headers: cors,
