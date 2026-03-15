@@ -1,7 +1,12 @@
 {
   "name": "movvi-dashboard",
   "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
-    "@neondatabase/serverless": "^0.10.4"
+    "@neondatabase/serverless": "^0.10.4",
+    "express": "^4.18.2"
   }
 }
