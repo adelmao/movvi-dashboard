@@ -82,99 +82,88 @@ tr:hover td{background:var(--surface2)}
   </div>
 </div>
 <script>
-var H='ep-twilight-wildflower-ajjlpuv4-pooler.c-3.us-east-2.aws.neon.tech',U='neondb_owner',P='npg_3inxfuloOrK6';
-var allData=[];
+var allData = [];
 
-async function nq(query,params){
-  // Try method 1: Authorization Basic
-  var auth='Basic '+btoa(U+':'+P);
-  var r=await fetch('https://'+H+'/sql',{
-    method:'POST',
-    headers:{'Content-Type':'application/json','Authorization':auth},
-    body:JSON.stringify({query:query,params:params||[]})
+async function neonSQL(query, params) {
+  var r = await fetch('/.netlify/functions/neon', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({query: query, params: params || []})
   });
-  var j=await r.json();
-  if(j.message&&j.message.includes('password')){
-    // Try method 2: Neon-Connection-String
-    var conn='postgresql://'+U+':'+P+'@'+H+'/neondb?sslmode=require';
-    r=await fetch('https://'+H+'/sql',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Neon-Connection-String':conn},
-      body:JSON.stringify({query:query,params:params||[]})
-    });
-    j=await r.json();
-  }
-  if(j.message)throw new Error(j.message);
-  return j;
+  if (!r.ok) throw new Error('HTTP ' + r.status + ': ' + await r.text());
+  return r.json();
 }
 
-async function loadData(){
-  var st=document.getElementById('st');
-  st.className='sbadge s-load';st.textContent='A ligar...';
-  document.getElementById('tbl').innerHTML='<div class="empty">A carregar dados...</div>';
-  try{
-    await nq('CREATE TABLE IF NOT EXISTS quiz_resultados (id SERIAL PRIMARY KEY,motorista_nome TEXT,motorista_id TEXT,telefone TEXT,cidade TEXT,plataforma TEXT,pontuacao INTEGER,total_perguntas INTEGER,percentagem NUMERIC(5,2),data_teste TIMESTAMP DEFAULT NOW())');
-    var res=await nq('SELECT * FROM quiz_resultados ORDER BY data_teste DESC');
-    allData=res.rows||[];
-    st.className='sbadge s-ok';st.textContent='✅ Ligado · '+allData.length+' registos';
-    kpis();doFilter();
-  }catch(e){
-    st.className='sbadge s-err';st.textContent='❌ Erro';
-    document.getElementById('tbl').innerHTML='<div class="empty">❌ Erro ao ligar:<br><br><code style="font-size:11px;color:#fca5a5;word-break:break-all">'+e.message+'</code><br><br><button onclick="loadData()" style="margin-top:12px;padding:8px 20px;border-radius:8px;background:var(--blue);color:#fff;border:none;cursor:pointer;font-family:inherit">Tentar novamente</button></div>';
+async function loadData() {
+  var st = document.getElementById('st');
+  st.className = 'sbadge s-load';
+  st.textContent = 'A ligar...';
+  document.getElementById('tbl').innerHTML = '<div class="empty">A carregar dados...</div>';
+  try {
+    var res = await neonSQL('SELECT * FROM quiz_resultados ORDER BY data_teste DESC');
+    allData = res.rows || [];
+    st.className = 'sbadge s-ok';
+    st.textContent = '✅ Ligado · ' + allData.length + ' registos';
+    kpis(); doFilter();
+  } catch(e) {
+    st.className = 'sbadge s-err';
+    st.textContent = '❌ Erro';
+    document.getElementById('tbl').innerHTML = '<div class="empty">❌ Erro ao ligar:<br><br><code style="font-size:11px;color:#fca5a5;word-break:break-all">' + e.message + '</code><br><br><button onclick="loadData()" style="margin-top:12px;padding:8px 20px;border-radius:8px;background:var(--blue);color:#fff;border:none;cursor:pointer;font-family:inherit">🔄 Tentar novamente</button></div>';
     console.error(e);
   }
 }
 
-function kpis(){
-  if(!allData.length){['k1','k2','k3','k4','k5'].forEach(function(i){document.getElementById(i).textContent='0';});return;}
-  var pcts=allData.map(function(r){return parseFloat(r.percentagem||0);});
-  document.getElementById('k1').textContent=allData.length;
-  document.getElementById('k2').textContent=new Set(allData.map(function(r){return(r.motorista_nome||'').toLowerCase();})).size;
-  document.getElementById('k3').textContent=Math.round(pcts.reduce(function(a,b){return a+b;},0)/pcts.length)+'%';
-  document.getElementById('k4').textContent=Math.round(pcts.filter(function(p){return p>=70;}).length/pcts.length*100)+'%';
-  document.getElementById('k5').textContent=Math.max.apply(null,pcts)+'%';
+function kpis() {
+  if (!allData.length) { ['k1','k2','k3','k4','k5'].forEach(function(i){document.getElementById(i).textContent='0';}); return; }
+  var pcts = allData.map(function(r){return parseFloat(r.percentagem||0);});
+  document.getElementById('k1').textContent = allData.length;
+  document.getElementById('k2').textContent = new Set(allData.map(function(r){return(r.motorista_nome||'').toLowerCase();})).size;
+  document.getElementById('k3').textContent = Math.round(pcts.reduce(function(a,b){return a+b;},0)/pcts.length)+'%';
+  document.getElementById('k4').textContent = Math.round(pcts.filter(function(p){return p>=70;}).length/pcts.length*100)+'%';
+  document.getElementById('k5').textContent = Math.max.apply(null,pcts)+'%';
 }
 
-function doFilter(){
-  var n=document.getElementById('fn').value.toLowerCase();
-  var c=document.getElementById('fc').value;
-  var p=document.getElementById('fp').value;
-  var r=document.getElementById('fr').value;
-  var d=allData.filter(function(x){
-    if(n&&!(x.motorista_nome||'').toLowerCase().includes(n)&&!(x.motorista_id||'').toLowerCase().includes(n))return false;
-    if(c&&x.cidade!==c)return false;
-    if(p&&x.plataforma!==p)return false;
-    var pct=parseFloat(x.percentagem||0);
-    if(r==='ok'&&pct<70)return false;
-    if(r==='nok'&&pct>=70)return false;
+function doFilter() {
+  var n = document.getElementById('fn').value.toLowerCase();
+  var c = document.getElementById('fc').value;
+  var p = document.getElementById('fp').value;
+  var r = document.getElementById('fr').value;
+  var d = allData.filter(function(x) {
+    if (n && !(x.motorista_nome||'').toLowerCase().includes(n) && !(x.motorista_id||'').toLowerCase().includes(n)) return false;
+    if (c && x.cidade !== c) return false;
+    if (p && x.plataforma !== p) return false;
+    var pct = parseFloat(x.percentagem||0);
+    if (r==='ok' && pct<70) return false;
+    if (r==='nok' && pct>=70) return false;
     return true;
   });
-  document.getElementById('cnt').textContent=d.length+' resultado'+(d.length!==1?'s':'');
+  document.getElementById('cnt').textContent = d.length + ' resultado' + (d.length!==1?'s':'');
   render(d);
 }
 
-function render(data){
-  var t=document.getElementById('tbl');
-  if(!data.length){t.innerHTML='<div class="empty">Nenhum resultado encontrado.</div>';return;}
-  var rows=data.map(function(r){
-    var p=parseFloat(r.percentagem||0),ok=p>=70;
-    var col=p>=80?'var(--green)':p>=60?'var(--yellow)':'var(--red)';
-    var dt=r.data_teste?new Date(r.data_teste).toLocaleString('pt-PT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+function render(data) {
+  var t = document.getElementById('tbl');
+  if (!data.length) { t.innerHTML = '<div class="empty">Nenhum resultado encontrado.</div>'; return; }
+  var rows = data.map(function(r) {
+    var p = parseFloat(r.percentagem||0), ok = p>=70;
+    var col = p>=80?'var(--green)':p>=60?'var(--yellow)':'var(--red)';
+    var dt = r.data_teste ? new Date(r.data_teste).toLocaleString('pt-PT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
     return '<tr><td><strong>'+(r.motorista_nome||'—')+'</strong></td><td style="color:var(--muted)">'+(r.motorista_id||'—')+'</td><td style="color:var(--muted)">'+(r.telefone||'—')+'</td><td style="color:var(--muted)">'+(r.cidade||'—')+'</td><td style="color:var(--muted)">'+(r.plataforma||'—')+'</td><td><strong style="color:'+col+'">'+p+'%</strong><div class="pct-bar"><div class="pct-fill" style="width:'+p+'%;background:'+col+'"></div></div></td><td style="color:var(--muted)">'+(r.pontuacao||0)+'/'+(r.total_perguntas||30)+'</td><td><span class="badge '+(ok?'bok':'bnok')+'">'+(ok?'✅ Aprovado':'⚠️ Reprovado')+'</span></td><td style="color:var(--muted);font-size:11px">'+dt+'</td></tr>';
   }).join('');
-  t.innerHTML='<div style="overflow-x:auto"><table><thead><tr><th>Nome</th><th>ID</th><th>Telefone</th><th>Cidade</th><th>Plataforma</th><th>Resultado</th><th>Pontos</th><th>Estado</th><th>Data</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+  t.innerHTML = '<div style="overflow-x:auto"><table><thead><tr><th>Nome</th><th>ID</th><th>Telefone</th><th>Cidade</th><th>Plataforma</th><th>Resultado</th><th>Pontos</th><th>Estado</th><th>Data</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
 
-function exportCSV(){
-  if(!allData.length){alert('Sem dados.');return;}
-  var h=['Nome','ID','Telefone','Cidade','Plataforma','Percentagem','Pontuacao','Total','Data'];
-  var rows=allData.map(function(r){return[r.motorista_nome,r.motorista_id,r.telefone,r.cidade,r.plataforma,r.percentagem,r.pontuacao,r.total_perguntas,r.data_teste?new Date(r.data_teste).toLocaleString('pt-PT'):''].map(function(v){return'"'+(v||'').toString().replace(/"/g,'""')+'"';}).join(',');});
-  var csv=[h.join(',')].concat(rows).join('\n');
-  var a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
-  a.download='movvi_'+new Date().toISOString().slice(0,10)+'.csv';
+function exportCSV() {
+  if (!allData.length) { alert('Sem dados.'); return; }
+  var h = ['Nome','ID','Telefone','Cidade','Plataforma','Percentagem','Pontuacao','Total','Data'];
+  var rows = allData.map(function(r){return[r.motorista_nome,r.motorista_id,r.telefone,r.cidade,r.plataforma,r.percentagem,r.pontuacao,r.total_perguntas,r.data_teste?new Date(r.data_teste).toLocaleString('pt-PT'):''].map(function(v){return'"'+(v||'').toString().replace(/"/g,'""')+'"';}).join(',');});
+  var csv = [h.join(',')].concat(rows).join('\n');
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+  a.download = 'movvi_'+new Date().toISOString().slice(0,10)+'.csv';
   a.click();
 }
+
 loadData();
 </script>
 </body>
