@@ -1,11 +1,23 @@
+from pathlib import Path
 import os
 
-BASE_DIR = "/opt/tvde"
+BASE_DIR = Path("/opt/tvde")
 
-DB_PATH = os.path.join(BASE_DIR, "tvde_data.db")
+# Base de dados
+DB_PATH = BASE_DIR / "tvde_data.db"
 
-LOG_DIR = os.path.join(BASE_DIR, "logs")
+# Diretórios
+DASHBOARD_DIR = BASE_DIR / "dashboard"
+STATIC_DIR = BASE_DIR / "static"
+LOG_DIR = BASE_DIR / "logs"
+BACKUP_DIR = BASE_DIR / "backups"
 
-STATIC_DIR = os.path.join(BASE_DIR, "static")
+# Aplicação
+HOST = "127.0.0.1"
+PORT = 5000
 
-DASHBOARD_DIR = os.path.join(BASE_DIR, "dashboard")
+# Timezone
+TZ = "Europe/Lisbon"
+
+# Ambiente
+ENV = os.getenv("MOVVI_ENV", "production")
