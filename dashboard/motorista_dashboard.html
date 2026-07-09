@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Movvi — Os Meus Resultados</title><meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"><meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:     #0f172a;
+    --card:   #1e293b;
+    --border: #334155;
+    --text:   #ffffff;
+    --sub:    #e2e8f0;
+    --muted:  #94a3b8;
+    --uber:   #276ef1;
+    --bolt:   #34d399;
+    --acc:    #22d3ee;
+    --green:  #4ade80;
+    --amber:  #fbbf24;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); font-size: 30.4px; font-weight: 500; }
+  header { background: var(--card); border-bottom: 1px solid var(--border); padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+  .hdr-left { display: flex; align-items: center; gap: 10px; }
+  .hdr-left img { height: 28px; }
+  .hdr-title { font-size: 22.8px; font-weight: 700; }
+  .hdr-name { font-size: 18.2px; color: var(--acc); margin-top: 1px; }
+  .logout-btn { background: none; border: 1px solid var(--border); color: var(--sub); padding: 8px 14px; border-radius: 8px; font-size: 19.7px; cursor: pointer; }
+  .chgpass-btn { background: none; border: 1px solid var(--border); color: var(--sub); padding: 8px 14px; border-radius: 8px; font-size: 19.7px; cursor: pointer; margin-right: 8px; }
+  .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.6); z-index:100; align-items:center; justify-content:center; }
+  .modal-overlay.open { display:flex; }
+  .modal-box { background:var(--card); border-radius:16px; padding:28px 24px; width:320px; max-width:90%; }
+  .modal-box h3 { margin:0 0 20px; font-size:18px; color:var(--txt); }
+  .modal-box input { width:100%; padding:12px; border:1px solid var(--border); border-radius:8px; background:var(--bg); color:var(--txt); font-size:15px; margin-bottom:12px; box-sizing:border-box; }
+  .modal-box .btn-save { width:100%; padding:13px; background:var(--acc); color:#fff; border:none; border-radius:8px; font-size:16px; font-weight:700; cursor:pointer; }
+  .modal-box .btn-cancel { width:100%; padding:11px; background:none; color:var(--sub); border:1px solid var(--border); border-radius:8px; font-size:14px; cursor:pointer; margin-top:8px; }
+  .modal-msg { font-size:13px; margin-bottom:10px; min-height:18px; }
+  main { padding: 16px 10px 40px; max-width: 100%; margin: 0 auto; }
+  .period-bar { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+  .period-btn { background: var(--card); border: 1.5px solid var(--border); color: var(--sub); padding: 12px 4px; border-radius: 10px; font-size: 19.7px; font-weight: 700; cursor: pointer; text-align: center; line-height: 1.4; }
+  .period-btn.active { border-color: var(--acc); color: var(--acc); background: rgba(34,211,238,.1); }
+  .kpi-main { background: linear-gradient(135deg, rgba(34,211,238,.12), rgba(34,211,238,.04)); border: 1.5px solid var(--acc); border-radius: 16px; padding: 20px 18px; margin-bottom: 12px; text-align: center; }
+  .kpi-main-label { font-size: 16.7px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--acc); margin-bottom: 6px; }
+  .kpi-main-value { font-size: 69.8px; font-weight: 900; line-height: 1; color: #ffffff; }
+  .kpi-main-period { font-size: 18.2px; color: var(--muted); margin-top: 6px; }
+  .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .kpi-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
+  .kpi-label { font-size: 19.7px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; margin-bottom: 6px; }
+  .kpi-value { font-size: 48.6px; font-weight: 900; line-height: 1; color: #ffffff; }
+  .section { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; }
+  .section-title { font-size: 21.2px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; margin-bottom: 14px; }
+  .plat-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .plat-row:last-child { margin-bottom: 0; }
+  .plat-name { width: 44px; font-size: 19.7px; font-weight: 700; }
+  .plat-bar-wrap { flex: 1; background: rgba(255,255,255,.06); border-radius: 4px; height: 8px; }
+  .plat-bar { height: 100%; border-radius: 4px; transition: width .5s ease; min-width: 2px; }
+  .plat-val { font-size: 25.8px; font-weight: 800; width: 68px; text-align: right; }
+  .prio-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,.05); font-size: 24.2px; }
+  .prio-row:last-child { border-bottom: none; }
+  .prio-row-label { color: var(--sub); }
+  .prio-row-val { font-weight: 800; color: #ffffff; }
+  .empty { text-align: center; color: var(--muted); font-size: 19.7px; padding: 16px 0; }
+  .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 0; gap: 14px; }
+  .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--acc); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading p { color: #475569; font-size: 21.2px; }
+  .score-circle { width: 110px; height: 110px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 0 auto 16px; border: 4px solid; }
+  .score-num { font-size: 38px; font-weight: 900; line-height: 1; }
+  .score-label { font-size: 13px; font-weight: 700; margin-top: 2px; }
+  .rank-badge { text-align: center; margin-bottom: 16px; }
+  .rank-pos { font-size: 52px; font-weight: 900; line-height: 1; }
+  .rank-sub { font-size: 16px; color: var(--muted); margin-top: 2px; }
+  .metric-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .metric-icon { font-size: 22px; width: 30px; text-align: center; }
+  .metric-info { flex: 1; }
+  .metric-name { font-size: 15px; color: var(--sub); font-weight: 600; }
+  .metric-vals { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .metric-bar-wrap { width: 80px; background: rgba(255,255,255,.08); border-radius: 4px; height: 8px; }
+  .metric-bar { height: 100%; border-radius: 4px; transition: width .6s ease; }
+  .metric-score { font-size: 15px; font-weight: 800; width: 36px; text-align: right; }
+</style>
+</head>
+<body>
+<header>
+  <div class="hdr-left">
+    <img src="/logomovvi.jpg" alt="Movvi" onerror="this.style.display='none'">
+    <div>
+      <div class="hdr-title">Os Meus Resultados</div>
+      <div class="hdr-name" id="headerName"></div>
+    </div>
+  </div>
+  <button class="chgpass-btn" onclick="document.getElementById('modalSenha').classList.add('open')">🔑 Senha</button>
+  <button class="logout-btn" onclick="location.href='/motorista/logout'">Sair</button>
+</header>
+<main>
+  <div id="loadingDiv" class="loading">
+    <div class="spinner"></div>
+    <p>A carregar...</p>
+  </div>
+  <div id="content" style="display:none">
+    <div class="period-bar">
+      <button class="period-btn" data-period="hoje">Hoje</button>
+      <button class="period-btn" data-period="ontem">Ontem</button>
+      <button class="period-btn active" data-period="semana">Semana<br>Atual</button>
+      <button class="period-btn" data-period="semana_ant">Semana<br>Passada</button>
+    </div>
+    <div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size: 16.7px;color:#fbbf24;line-height:1.5;text-align:center">
+      Valores sujeitos a alteracao em funcao dos dados serem obtidos das plataformas SEM VALIDACAO. O valor correto e o do <strong>Movvi.com.pt</strong> semanal.
+    </div>
+    <div style="background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.2);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#22d3ee;text-align:center">
+      🔄 Dados atualizados automaticamente a cada 8 horas
+    </div>
+    <div class="kpi-main">
+      <div class="kpi-main-label">Faturação Líquida</div>
+      <div class="kpi-main-value" id="kFat">...</div>
+      <div class="kpi-main-period" id="kPeriodo"></div>
+    </div>
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Ranking €/km</div>
+        <div class="kpi-value" id="kRanking">...</div>
+        <div style="font-size: 16.7px;color:var(--muted);margin-top:4px" id="kRankingTotal"></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">KM Total</div>
+        <div class="kpi-value" id="kKm">...</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">euros / KM</div>
+        <div class="kpi-value" id="kEkm">...</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Viatura</div>
+        <div class="kpi-value" style="font-size: 24.2px;padding-top:4px" id="kViatura">...</div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">Plataformas</div>
+      <div class="plat-row">
+        <div class="plat-name" style="color:#ffffff;font-size: 22.8px">Uber</div>
+        <div class="plat-bar-wrap"><div class="plat-bar" id="barUber" style="width:0%;background:var(--uber)"></div></div>
+        <div class="plat-val" id="valUber" style="color:var(--uber)">...</div>
+      </div>
+      <div class="plat-row">
+        <div class="plat-name" style="color:#ffffff;font-size: 22.8px">Bolt</div>
+        <div class="plat-bar-wrap"><div class="plat-bar" id="barBolt" style="width:0%;background:var(--bolt)"></div></div>
+        <div class="plat-val" id="valBolt" style="color:var(--bolt)">...</div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">Consumo Prio</div>
+      <div id="prioContent"><div class="empty">Sem dados Prio no periodo</div></div>
+    </div>
+    <div class="section" id="comportSection">
+      <div class="section-title">Comportamento ao Volante</div>
+      <div id="comportContent"><div class="empty">A carregar...</div></div>
+    </div>
+    <div class="section">
+      <div class="section-title">Faturação Diária (€)</div>
+      <canvas id="chartFat" height="180"></canvas>
+    </div>
+    <div class="section">
+      <div class="section-title">Eficiencia €/km</div>
+      <canvas id="chartEkm" height="150"></canvas>
+    </div>
+  </div>
+</main>
+<script>
+var chartFat=null,chartEkm=null;
+function getDateRange(p){
+  // Usar hora de Lisboa (UTC+1 ou UTC+2 no verao)
+  var now=new Date();
+  var lisboa=new Date(now.toLocaleString('en-US',{timeZone:'Europe/Lisbon'}));
+  var t=lisboa;
+  var fmt=function(d){var y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0');return y+'-'+m+'-'+dd;};
+  var dow=t.getDay(),dm=dow===0?6:dow-1;
+  if(p==='hoje'){var s=fmt(t);return{from:s,to:s,label:'Hoje'};}
+  if(p==='ontem'){var y=new Date(t);y.setDate(t.getDate()-1);var s=fmt(y);return{from:s,to:s,label:'Ontem'};}
+  if(p==='semana'){
+    var m=new Date(t);
+    m.setDate(t.getDate()-dm);
+    // garantir que m e segunda (dow=1)
+    while(m.getDay()!==1){m.setDate(m.getDate()+1);}
+    if(m>t){m.setDate(m.getDate()-7);}
+    return{from:fmt(m),to:fmt(t),label:'Semana Atual'};
+  }
+  if(p==='semana_ant'){var lm=new Date(t);lm.setDate(t.getDate()-dm-7);var ls=new Date(t);ls.setDate(t.getDate()-dm-1);return{from:fmt(lm),to:fmt(ls),label:'Semana Passada'};}
+}
+function nf(v,d){d=d||2;return(v==null||isNaN(v))?'--':Number(v).toFixed(d);}
+function fd(s){var p=s.split('-');return p[2]+'/'+p[1];}
+async function loadData(period){
+  var r=getDateRange(period);
+  var res=await fetch('/api/motorista/kpis?from='+r.from+'&to='+r.to);
+  if(res.status===401){location.href='/motorista/login';return null;}
+  return res.ok?res.json():null;
+}
+async function loadPrioDetalhe(period){
+  var r=getDateRange(period);
+  var res=await fetch('/api/motorista/prio/detalhe?from='+r.from+'&to='+r.to);
+  return res.ok?res.json():null;
+}
+
+async function loadPrio(period){
+  var r=getDateRange(period);
+  var res=await fetch('/api/motorista/prio?from='+r.from+'&to='+r.to);
+  return res.ok?res.json():null;
+}
+async function loadRanking(period){
+  var r=getDateRange(period);
+  var res=await fetch('/api/motorista/ranking?from='+r.from+'&to='+r.to);
+  return res.ok?res.json():null;
+}
+function renderKpis(data,period){
+  var t=data.totais,r=getDateRange(period);
+  document.getElementById('headerName').textContent=data.nome||'';
+  document.getElementById('kFat').textContent='€'+nf(t.fat_total);
+  document.getElementById('kKm').textContent=nf(t.km_total,0);
+  document.getElementById('kEkm').textContent=nf(t.receita_km,3);
+  document.getElementById('kViatura').textContent=data.matricula||'--';
+  document.getElementById('kPeriodo').textContent=r.label+(r.from===r.to?' - '+fd(r.from):' - '+fd(r.from)+' a '+fd(r.to));
+  var total=(t.fat_uber||0)+(t.fat_bolt||0)||1;
+  document.getElementById('barUber').style.width=Math.round((t.fat_uber||0)/total*100)+'%';
+  document.getElementById('barBolt').style.width=Math.round((t.fat_bolt||0)/total*100)+'%';
+  document.getElementById('valUber').textContent='€'+nf(t.fat_uber);
+  document.getElementById('valBolt').textContent='€'+nf(t.fat_bolt);
+}
+function renderRanking(ranking){
+  var el=document.getElementById('kRanking'),el2=document.getElementById('kRankingTotal');
+  if(!ranking||ranking.posicao==null){el.textContent='--';el2.textContent='';return;}
+  el.textContent=ranking.posicao+'o';
+  el2.textContent='de '+ranking.total+' motoristas';
+}
+function renderPrio(prio,detalhe){
+  var el=document.getElementById('prioContent');
+  if(!prio||(!prio.kwh&&!prio.valor)){el.innerHTML='<div class="empty">Sem dados Prio no periodo</div>';return;}
+  var html='<div class="prio-row"><span class="prio-row-label">Carregamentos</span><span class="prio-row-val">'+(prio.n_carregamentos||0)+'</span></div>'
+    +'<div class="prio-row"><span class="prio-row-label">Total kWh</span><span class="prio-row-val">'+nf(prio.kwh,1)+' kWh</span></div>'
+    +'<div class="prio-row"><span class="prio-row-label">Custo Total</span><span class="prio-row-val">€'+nf(prio.valor)+'</span></div>'
+    +(prio.kwh_km?'<div class="prio-row"><span class="prio-row-label">kWh/km</span><span class="prio-row-val">'+nf(prio.kwh_km,3)+'</span></div>':'')
+    +(prio.eur_km?'<div class="prio-row"><span class="prio-row-label">€/km</span><span class="prio-row-val">€'+nf(prio.eur_km,3)+'</span></div>':'')
+  +(prio.kwh&&prio.valor&&prio.kwh>0?'<div class="prio-row"><span class="prio-row-label">€/kWh média</span><span class="prio-row-val" style="color:'+(prio.valor/prio.kwh<0.30?'#22c55e':prio.valor/prio.kwh<0.45?'#f59e0b':'#ef4444')+'">€'+nf(prio.valor/prio.kwh,2)+'</span></div>':'');
+  if(detalhe&&detalhe.transacoes&&detalhe.transacoes.length>0){
+    html+='<div style="margin-top:14px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin-bottom:8px">Detalhe</div>';
+    html+='<table style="width:100%;border-collapse:collapse;font-size:14px">';
+    html+='<tr style="color:#64748b;font-size:11px"><th style="text-align:left;padding:5px 4px">Data</th><th style="text-align:left;padding:5px 4px">Hora</th><th style="text-align:left;padding:5px 4px">Viatura</th><th style="text-align:left;padding:5px 4px">Posto</th><th style="text-align:right;padding:5px 4px">kWh</th><th style="text-align:right;padding:5px 4px">€ c/IVA</th><th style="text-align:right;padding:5px 4px;color:#f97316">€/kWh</th></tr>';
+    detalhe.transacoes.forEach(function(t){
+      var eur_kwh = t.kwh > 0 ? t.valor / t.kwh : 0;
+      var eur_kwh_col = eur_kwh > 0 ? (eur_kwh < 0.15 ? '#22c55e' : eur_kwh < 0.25 ? '#f59e0b' : '#ef4444') : '#64748b';
+      html+='<tr style="border-top:1px solid rgba(255,255,255,.06)">'
+        +'<td style="padding:7px 4px;color:#e2e8f0">'+t.data.slice(5).replace("-","/")+' </td>'
+        +'<td style="padding:7px 4px;color:#e2e8f0">'+t.hora_transacao.slice(0,5)+'</td>'
+        +'<td style="padding:7px 4px;color:#e2e8f0">'+t.matricula+'</td>'
+        +'<td style="padding:7px 4px;color:#94a3b8;font-size:12px">'+( t.station_name||'-')+'</td>'
+        +'<td style="padding:7px 4px;text-align:right;color:#e2e8f0">'+nf(t.kwh,2)+'</td>'
+        +'<td style="padding:7px 4px;text-align:right;font-weight:700;color:#ffffff">€'+nf(t.valor,2)+'</td>'
+        +'<td style="padding:7px 4px;text-align:right;font-weight:800;color:'+eur_kwh_col+'">'+( eur_kwh > 0 ? '€'+nf(eur_kwh,3) : '-')+'</td>'
+        +'</tr>';
+    });
+    html+='</table>';
+  }
+  el.innerHTML=html;
+}
+function renderCharts(historico){
+  var labels=historico.map(function(r){return fd(r.data);});
+  var fats=historico.map(function(r){return r.fat||0;});
+  var ekms=historico.map(function(r){return r.receita_km||0;});
+  var grid='rgba(255,255,255,.08)',tick='#94a3b8';
+  if(chartFat)chartFat.destroy();
+  chartFat=new Chart(document.getElementById('chartFat'),{type:'bar',data:{labels:labels,datasets:[{data:fats,backgroundColor:'rgba(34,211,238,.5)',borderColor:'#22d3ee',borderWidth:1,borderRadius:5}]},options:{responsive:true,plugins:{legend:{display:false},datalabels:{display:false}},scales:{x:{ticks:{color:tick,font:{size:11},maxRotation:0,maxTicksLimit:7},grid:{color:grid}},y:{ticks:{color:tick,font:{size:11},callback:function(v){return '€'+v;}},grid:{color:grid}}},animation:{onComplete:function(){var ctx=this.ctx;ctx.save();ctx.font='bold 22px sans-serif';ctx.fillStyle='#ffffff';ctx.textAlign='center';ctx.textBaseline='bottom';this.data.datasets[0].data.forEach(function(val,i){var meta=this.getDatasetMeta(0);var bar=meta.data[i];if(val>0)ctx.fillText('€'+val.toFixed(0),bar.x,bar.y-3);}.bind(this));ctx.restore();}}}});
+  if(chartEkm)chartEkm.destroy();
+  chartEkm=new Chart(document.getElementById('chartEkm'),{type:'line',data:{labels:labels,datasets:[{data:ekms,borderColor:'#16a34a',backgroundColor:'rgba(74,222,128,.08)',borderWidth:2,pointRadius:4,pointBackgroundColor:'#16a34a',tension:.3,fill:true}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:tick,font:{size:11},maxRotation:0,maxTicksLimit:7},grid:{color:grid}},y:{ticks:{color:tick,font:{size:11},callback:function(v){return v.toFixed(2);}},grid:{color:grid}}}}});
+}
+async function loadComportamento(period){
+  var r=getDateRange(period);
+  var res=await fetch('/api/motorista/comportamento?from='+r.from+'&to='+r.to);
+  return res.ok?res.json():null;
+}
+function renderComportamento(c){
+  var el=document.getElementById('comportContent');
+  if(!c||c.sem_dados){el.innerHTML='<div class="empty">Sem dados de comportamento no periodo</div>';return;}
+  var cor=c.cor||'#94a3b8';
+  var ordinal=c.ranking?c.ranking+'º':'--';
+  var percentilTxt=c.percentil?'Top '+c.percentil+'%':'';
+  // Calcular bar width por metrica (inverso da penalizacao)
+  function barW(val,max){return Math.max(0,Math.min(100,Math.round((1-val/max)*100)))+'%';}
+  function barCol(val,thresh){return val<=thresh*0.5?'#16a34a':val<=thresh?'#d97706':'#dc2626';}
+  var mf=c.media_frota||{};
+  var mfSpeed100 = mf.speed_100||0;
+  var mfSpeedMin = mf.speed_min||0;
+  var html=
+    '<div class="score-circle" style="border-color:'+cor+';background:'+cor+'18">'+
+      '<div class="score-num" style="color:'+cor+'">'+c.score+'</div>'+
+      '<div class="score-label" style="color:'+cor+'">'+c.nota+'</div>'+
+    '</div>'+
+    '<div class="rank-badge">'+
+      '<div class="rank-pos" style="color:'+cor+'">'+ordinal+'</div>'+
+      (percentilTxt?'<div style="font-size:14px;color:'+cor+';font-weight:700;margin-top:4px">'+percentilTxt+'</div>':'')+
+    '</div>'+
+    '<div style="font-size:13px;color:var(--muted);text-align:center;margin-bottom:16px">'+
+      c.km_total+' km no periodo'+
+    '</div>'+
+    // Travagens (15%)
+    '<div class="metric-row">'+
+      '<div class="metric-icon">🛑</div>'+
+      '<div class="metric-info">'+
+        '<div class="metric-name">Travagens Bruscas <span style="font-size:11px;color:var(--muted)">(30%)</span></div>'+
+        '<div class="metric-vals">'+c.metricas.trav.val+' eventos &middot; '+c.trav_100km+'/100km &middot; frota: '+mf.trav_100km+'</div>'+
+      '</div>'+
+      '<div class="metric-bar-wrap"><div class="metric-bar" style="width:'+barW(c.trav_100km,8)+';background:'+barCol(c.trav_100km,8)+'"></div></div>'+
+    '</div>'+
+    // Aceleracoes (15%)
+    '<div class="metric-row">'+
+      '<div class="metric-icon">🚀</div>'+
+      '<div class="metric-info">'+
+        '<div class="metric-name">Aceleracoes Bruscas <span style="font-size:11px;color:var(--muted)">(30%)</span></div>'+
+        '<div class="metric-vals">'+c.metricas.acel.val+' eventos &middot; '+c.acel_100km+'/100km &middot; frota: '+mf.acel_100km+'</div>'+
+      '</div>'+
+      '<div class="metric-bar-wrap"><div class="metric-bar" style="width:'+barW(c.acel_100km,8)+';background:'+barCol(c.acel_100km,8)+'"></div></div>'+
+    '</div>'+
+    // Curvas (10%)
+    '<div class="metric-row">'+
+      '<div class="metric-icon">↩️</div>'+
+      '<div class="metric-info">'+
+        '<div class="metric-name">Curvas Bruscas <span style="font-size:11px;color:var(--muted)">(15%)</span></div>'+
+        '<div class="metric-vals">'+c.metricas.curv.val+' eventos &middot; '+c.curv_100km+'/100km &middot; frota: '+mf.curv_100km+'</div>'+
+      '</div>'+
+      '<div class="metric-bar-wrap"><div class="metric-bar" style="width:'+barW(c.curv_100km,80)+';background:'+barCol(c.curv_100km,32)+'"></div></div>'+
+    '</div>'+
+    // Excesso velocidade eventos (15%)
+    '<div class="metric-row">'+
+      '<div class="metric-icon">🚨</div>'+
+      '<div class="metric-info">'+
+        '<div class="metric-name">Excesso Velocidade <span style="font-size:11px;color:var(--muted)">(10%)</span></div>'+
+        '<div class="metric-vals">'+(c.metricas.speed_events&&c.metricas.speed_events.val||0)+' eventos &middot; '+(c.speed_100||0)+'/100km &middot; frota: '+mfSpeed100+'</div>'+
+      '</div>'+
+      '<div class="metric-bar-wrap"><div class="metric-bar" style="width:'+barW(c.speed_100||0,50)+';background:'+barCol(c.speed_100||0,30)+'"></div></div>'+
+    '</div>'+
+    // Tempo excesso velocidade (20%)
+    '<div class="metric-row">'+
+      '<div class="metric-icon">⏱️</div>'+
+      '<div class="metric-info">'+
+        '<div class="metric-name">Tempo Excesso Vel. <span style="font-size:11px;color:var(--muted)">(10%)</span></div>'+
+        '<div class="metric-vals">'+(c.metricas.speed_min&&c.metricas.speed_min.val||0)+' min &middot; frota: '+mfSpeedMin+' min</div>'+
+      '</div>'+
+      '<div class="metric-bar-wrap"><div class="metric-bar" style="width:'+barW(c.speed_min||0,120)+';background:'+barCol(c.speed_min||0,60)+'"></div></div>'+
+    '</div>'+
+    // Velocidade maxima (25%)
+    '<div class="metric-row">'+
+      '<div class="metric-icon">⚡</div>'+
+      '<div class="metric-info">'+
+        '<div class="metric-name">Velocidade Maxima <span style="font-size:11px;color:var(--muted)">(5%)</span></div>'+
+        '<div class="metric-vals">'+c.vmax+' km/h &middot; frota: '+mf.vmax+' km/h</div>'+
+      '</div>'+
+      '<div class="metric-bar-wrap"><div class="metric-bar" style="width:'+barW(Math.max(0,c.vmax-120),60)+';background:'+barCol(c.vmax,140)+'"></div></div>'+
+    '</div>';
+  el.innerHTML=html;
+}
+async function refresh(period){
+  document.getElementById('loadingDiv').style.display='flex';
+  document.getElementById('content').style.display='none';
+  var results=await Promise.all([loadData(period),loadPrio(period),loadRanking(period),loadPrioDetalhe(period),loadComportamento(period)]);
+  var data=results[0],prio=results[1],ranking=results[2],prioDetalhe=results[3],comport=results[4];
+  if(!data)return;
+  renderKpis(data,period);
+  renderPrio(prio,prioDetalhe);
+  renderRanking(ranking);
+  renderComportamento(comport);
+  renderCharts(data.historico);
+  document.getElementById('loadingDiv').style.display='none';
+  document.getElementById('content').style.display='block';
+}
+document.querySelectorAll('.period-btn').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('.period-btn').forEach(function(b){b.classList.remove('active');});
+    btn.classList.add('active');
+    refresh(btn.dataset.period);
+  });
+});
+refresh('semana');
+</script>
+<div class="modal-overlay" id="modalSenha">
+  <div class="modal-box">
+    <h3>🔑 Alterar Senha</h3>
+    <div class="modal-msg" id="msgSenha"></div>
+    <input type="password" id="pw1" placeholder="Nova senha (min. 6 caracteres)">
+    <input type="password" id="pw2" placeholder="Confirmar nova senha">
+    <button class="btn-save" onclick="guardarSenha()">Guardar</button>
+    <button class="btn-cancel" onclick="document.getElementById('modalSenha').classList.remove('open');document.getElementById('msgSenha').textContent=''">Cancelar</button>
+  </div>
+</div>
+<script>
+function guardarSenha(){
+  var p1=document.getElementById('pw1').value;
+  var p2=document.getElementById('pw2').value;
+  var msg=document.getElementById('msgSenha');
+  if(p1.length<6){msg.style.color='#ef4444';msg.textContent='Mínimo 6 caracteres';return;}
+  if(p1!==p2){msg.style.color='#ef4444';msg.textContent='As senhas não coincidem';return;}
+  fetch('/motorista/change-password',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'password='+encodeURIComponent(p1)+'&password2='+encodeURIComponent(p2)})
+  .then(function(r){return r.json();})
+  .then(function(d){
+    if(d.ok){msg.style.color='#22c55e';msg.textContent='Senha alterada com sucesso!';document.getElementById('pw1').value='';document.getElementById('pw2').value='';setTimeout(function(){document.getElementById('modalSenha').classList.remove('open');msg.textContent='';},2000);}
+    else{msg.style.color='#ef4444';msg.textContent=d.erro||'Erro ao alterar senha';}
+  });
+}
+</script>
+</body>
+</html>
