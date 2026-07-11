@@ -1,0 +1,15 @@
+[Unit]
+Description=Movvi OCPP 1.6j Server
+After=network-online.target movvi-charge.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/tvde
+EnvironmentFile=/opt/tvde/.env_charge_systemd
+ExecStart=/opt/tvde/venv/bin/python3 /opt/tvde/movvi-ocpp-server.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,993 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Movvi Charge</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800;900&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--ink:#101312;--sub:#5C6663;--line:#DDE3E0;--bg:#F4F6F5;--card:#fff;--grn:#146B3A;--grn-d:#0E5A30;--red:#E63329;--red-d:#C42B1F;--amb:#8A6D1A;--amb-bg:#F7F0DC;--blue:#2563EB}
+body{font-family:'Inter',sans-serif;color:var(--ink);background:var(--bg);min-height:100vh;display:flex;flex-direction:column}
+.mono{font-family:'IBM Plex Mono',monospace}
+/* topo */
+.top{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#fff;border-bottom:3px solid var(--ink);gap:10px;flex-wrap:wrap}
+.logo{display:flex;align-items:flex-end;gap:8px;line-height:1}
+.logo .word{font-family:'Archivo';font-weight:900;font-size:26px;letter-spacing:-.03em}
+.logo .v1{color:var(--grn)}.logo .v2{color:var(--red);position:relative}
+.logo .v2::before{content:'';position:absolute;top:-8px;left:50%;transform:translateX(-50%);width:8px;height:8px;border-radius:50%;background:var(--ink)}
+.logo .tag{font-family:'Archivo';font-weight:700;font-size:8px;letter-spacing:.42em;margin-bottom:3px}
+.logo .prod{font-family:'IBM Plex Mono';font-size:10px;font-weight:600;color:var(--grn);border:1px solid var(--grn);border-radius:6px;padding:3px 7px;margin-bottom:2px;margin-left:4px}
+.who{display:flex;align-items:center;gap:10px;font-size:13px;flex-wrap:wrap}
+.who b{font-weight:600}
+.plate{font:600 11px 'IBM Plex Mono';background:#EFF1F0;border-radius:6px;padding:3px 8px}
+.linkbtn{border:0;background:none;color:var(--sub);font:600 12px 'Inter';cursor:pointer;text-decoration:underline}
+.tabs{display:flex;gap:4px;background:#EFF1F0;padding:4px;border-radius:10px}
+.tab{border:0;background:transparent;color:var(--sub);padding:7px 14px;border-radius:8px;font:600 13px 'Inter';cursor:pointer}
+.tab.on{background:var(--ink);color:#fff}
+/* layout */
+.wrap{max-width:980px;margin:0 auto;padding:16px;width:100%;flex:1}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.ph{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;gap:8px;flex-wrap:wrap}
+.ph h2{font-family:'Archivo';font-size:15px;font-weight:800}
+.ph .sub{font-size:12px;color:var(--sub)}
+/* painel MIIO de sessão ativa */
+.miio{background:linear-gradient(135deg,#0A3D22 0%,#146B3A 100%);border-radius:16px;padding:20px;margin-bottom:12px;color:#fff;position:relative;overflow:hidden}
+.miio::before{content:'';position:absolute;top:-40px;right:-40px;width:180px;height:180px;border-radius:50%;background:rgba(255,255,255,.05)}
+.miio .posto-tag{font:600 10px 'IBM Plex Mono';letter-spacing:.14em;color:rgba(255,255,255,.7);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.miio .pulse{width:8px;height:8px;border-radius:50%;background:#4ADE80;animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(1.3)}}
+.miio .kwh-big{font:600 52px 'IBM Plex Mono';letter-spacing:-.02em;line-height:1;margin-bottom:4px}
+.miio .kwh-big span{font-size:20px;font-weight:500;opacity:.8;margin-left:4px}
+.miio .eur-big{font:700 28px 'IBM Plex Mono';color:#FCA5A5;margin-bottom:16px}
+.miio .stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;border-top:1px solid rgba(255,255,255,.15);padding-top:14px}
+.miio .stat-l{font:500 10px 'Inter';opacity:.7;text-transform:uppercase;letter-spacing:.08em}
+.miio .stat-v{font:600 18px 'IBM Plex Mono';margin-top:3px}
+.miio .stat-v.kw{color:#86EFAC}
+.miio .stat-v.time{color:#FCD34D}
+.miio .barra{height:6px;background:rgba(255,255,255,.2);border-radius:4px;margin-top:10px;overflow:hidden}
+.miio .barra i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,#4ADE80,#86EFAC);animation:flow 2s linear infinite;background-size:200% 100%}
+@keyframes flow{to{background-position:-200% 0}}
+.miio .info-row{display:flex;justify-content:space-between;font-size:11px;opacity:.7;margin-top:8px}
+.miio .btn-stop{display:block;width:100%;margin-top:16px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:10px;padding:12px;font:700 14px 'Inter';cursor:pointer;transition:background .2s}
+.miio .btn-stop:hover{background:rgba(220,38,38,.6)}
+/* postos */
+
+
+
+.driverHero{
+background:linear-gradient(135deg,#16A34A,#15803D);
+color:#fff;
+padding:20px;
+border-radius:16px;
+margin-bottom:18px;
+box-shadow:0 8px 20px rgba(22,163,74,.18);
+}
+.driverHero h2{
+margin:0;
+font-size:24px;
+font-weight:700;
+}
+.driverHero .sub{
+margin-top:6px;
+opacity:.95;
+font-size:14px;
+}
+.driverHero .stats{
+display:flex;
+justify-content:space-between;
+margin-top:16px;
+gap:12px;
+}
+.driverHero .box{
+flex:1;
+background:rgba(255,255,255,.15);
+padding:12px;
+border-radius:12px;
+text-align:center;
+}
+.driverHero .box .v{
+font-size:20px;
+font-weight:700;
+margin-top:4px;
+}
+
+.slot-card{
+    border:1px solid #E5E7EB;
+    border-radius:14px;
+    padding:14px;
+    margin-bottom:12px;
+    background:#fff;
+    box-shadow:0 2px 8px rgba(0,0,0,.05);
+}
+.slot-card .ttl{
+    font-size:18px;
+    font-weight:700;
+    margin-bottom:6px;
+}
+.slot-card .st{
+    font-size:14px;
+    color:#6B7280;
+    margin-bottom:12px;
+}
+
+
+.slot-card.disponivel{background:#F0FDF4;border:2px solid #BBF7D0}
+.slot-card.ocupado{background:#FEF2F2;border:2px solid #FECACA}
+.slot-card.meu{background:#EFF6FF;border:2px solid #BFDBFE}
+.slot-card.offline{background:#F5F5F5;border:2px solid #E5E5E5}
+
+.power{
+height:8px;
+border-radius:8px;
+background:#E5E7EB;
+overflow:hidden;
+margin-top:8px;
+}
+
+.power div{
+height:100%;
+background:#16A34A;
+border-radius:8px;
+transition:.3s;
+}
+
+.slot-card .act{
+    margin-top:10px;
+}
+
+
+.slot{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.slot .nm{font-size:14px;font-weight:600}
+.slot .det{font:500 12px 'IBM Plex Mono';color:var(--sub);margin-top:3px}
+.st{font:600 10px 'IBM Plex Mono';letter-spacing:.08em;padding:3px 8px;border-radius:20px}
+.st.on{color:var(--grn);background:#E4F2EA}
+.st.chg{color:#fff;background:var(--grn)}
+.st.off{color:var(--amb);background:var(--amb-bg)}
+.st.meu{color:#fff;background:var(--blue)}
+/* botões */
+.btn{border:0;border-radius:9px;padding:10px 14px;font:600 13px 'Inter';cursor:pointer;white-space:nowrap}
+.btn.go{background:var(--grn);color:#fff}.btn.go:hover{background:var(--grn-d)}
+.btn.stop{background:#FBE7E4;color:var(--red-d)}
+.btn.blue{background:var(--blue);color:#fff}
+.btn.sm{padding:7px 12px;font-size:12px}
+.btn:disabled{background:#EDF1EF;color:#9AA6A2;cursor:not-allowed}
+/* forms */
+input,select{width:100%;border:1px solid var(--line);border-radius:9px;padding:11px;font:500 14px 'Inter';background:#fff;margin-top:8px}
+/* kpis */
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+.kpi .l{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--sub);font-weight:600}
+.kpi .v{font-size:20px;font-weight:600;margin-top:3px}
+/* tabela */
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;font:600 9px 'IBM Plex Mono';letter-spacing:.08em;text-transform:uppercase;color:var(--sub);padding:6px;border-bottom:1px solid var(--line)}
+td{padding:8px 6px;border-bottom:1px solid #EDF1EF}
+.r{text-align:right}
+.note{font-size:11px;color:var(--sub);text-align:center;margin-top:6px;padding:0 8px}
+/* login */
+.gate{max-width:360px;margin:40px auto}
+.gtabs{display:flex;gap:4px;background:#EFF1F0;padding:4px;border-radius:10px;margin:12px 0 4px}
+.gtab{flex:1;border:0;background:transparent;color:var(--sub);padding:8px;border-radius:8px;font:600 13px 'Inter';cursor:pointer}
+.gtab.on{background:var(--ink);color:#fff}
+.err{color:var(--red-d);font-size:12px;margin-top:8px;min-height:16px}
+/* calendário */
+.cal{display:grid;gap:6px}
+.cal-header{display:grid;font:600 11px 'IBM Plex Mono';color:var(--sub);text-align:center;border-bottom:1px solid var(--line);padding-bottom:6px}
+.cal-row{display:grid;align-items:center;gap:4px;font-size:12px}
+.cal-hora{font:600 11px 'IBM Plex Mono';color:var(--sub);text-align:right;padding-right:6px}
+.cal-cell{border-radius:6px;padding:5px 4px;text-align:center;font-size:11px;min-height:28px;cursor:pointer;border:1px solid transparent;transition:all .15s}
+.cal-cell.livre{background:#E4F2EA;color:var(--grn);font-weight:600}
+.cal-cell.livre:hover{background:var(--grn);color:#fff}
+.cal-cell.ocupado{background:#FBE7E4;color:var(--red-d);cursor:default;font-size:10px}
+.cal-cell.minha{background:#DBEAFE;color:#1D4ED8;font-weight:600}
+.cal-cell.passado{background:#F4F6F5;color:#C4C9C7;cursor:default}
+/* modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;display:flex;align-items:center;justify-content:center}
+.modal{background:#fff;border-radius:16px;padding:20px;width:340px;max-width:95vw}
+.modal h3{font-family:'Archivo';font-weight:800;margin-bottom:12px}
+/* rodapé */
+.foot{background:var(--ink);color:#C9D2CE;text-align:center;padding:14px;font-size:12px;margin-top:auto}
+.foot .flogo{font-family:'Archivo';font-weight:900;font-size:15px;color:#fff}
+.foot .flogo .v1{color:#2FA25E}.foot .flogo .v2{color:var(--red)}
+.foot a{color:#fff;text-decoration:none;font-weight:600}
+.hidden{display:none}
+@media(max-width:520px){.kpis{grid-template-columns:1fr 1fr}.miio .kwh-big{font-size:40px}.miio .stats{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="logo">
+    <span class="word">MO<span class="v1">V</span><span class="v2">V</span>I</span>
+    <span class="tag">TVDE</span><span class="prod">CHARGE</span>
+  </div>
+  <div class="who hidden" id="whoBox">
+    <span id="whoNome"></span>
+    <span class="plate hidden" id="whoPlate"></span>
+    <button class="linkbtn" onclick="sair()">Sair</button>
+  </div>
+  <div class="tabs hidden" id="tabsGestao">
+    <button class="tab on" data-v="postos" onclick="gTab('postos')">Postos</button>
+    <button class="tab" data-v="debitos" onclick="gTab('debitos')">Débitos</button>
+    <button class="tab" data-v="ativos" onclick="gTab('ativos')">Ativos</button>
+    <button class="tab" data-v="reservas" onclick="gTab('reservas')">Reservas</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <!-- LOGIN -->
+  <div class="gate" id="gate">
+    <div class="panel">
+      <h2 style="font-family:'Archivo';font-weight:800;margin-bottom:4px">Movvi Charge</h2>
+      <p style="font-size:12px;color:var(--sub)">Carregamento da frota elétrica Movvi</p>
+      <div class="gtabs">
+        <button class="gtab on" id="gtM" onclick="gtab('m')">Motorista</button>
+        <button class="gtab" id="gtG" onclick="gtab('g')">Gestão</button>
+        <button class="gtab" id="gtP" onclick="gtab('p')">Disponibilidade</button>
+      </div>
+      <div id="loginM">
+        <input id="lEmail" type="email" placeholder="Email (o mesmo do Movvi)" autocomplete="username">
+        <input id="lPass" type="password" placeholder="Password do Movvi" autocomplete="current-password">
+        <button class="btn go" style="width:100%;margin-top:10px" onclick="loginMotorista()">Entrar</button>
+      </div>
+      <div id="loginG" class="hidden">
+        <input id="lKey" type="password" placeholder="Chave de acesso da gestão">
+        <button class="btn go" style="width:100%;margin-top:10px" onclick="loginGestao()">Entrar</button>
+      </div>
+      <div id="loginP" class="hidden">
+        <button class="btn go" style="width:100%;margin-top:10px" onclick="verDisponibilidade()">Ver postos</button>
+      </div>
+      <div class="err" id="gateErr"></div>
+    </div>
+  </div>
+
+  <!-- VISTA MOTORISTA -->
+  <div id="vMotorista" class="hidden">
+    <!-- painel MIIO sessão ativa -->
+    <div id="miioPanel" class="hidden"></div>
+
+<div class="panel" id="driverDashboard">
+<div class="ph">
+<h2>Dashboard</h2>
+</div>
+
+<div class="kpis">
+
+<div class="kpi">
+<div class="l">Postos livres</div>
+<div class="v mono" id="dashLivres">-</div>
+</div>
+
+<div class="kpi">
+<div class="l">Energia semana</div>
+<div class="v mono" id="dashKwh">-</div>
+</div>
+
+<div class="kpi">
+<div class="l">Total semana</div>
+<div class="v mono" id="dashEuro">-</div>
+</div>
+
+<div class="kpi">
+<div class="l">Próxima reserva</div>
+<div class="v mono" id="dashReserva">-</div>
+</div>
+
+</div>
+
+</div>
+
+<div class="driverHero">
+
+<h2 id="heroSaudacao">👋 Bem-vindo</h2>
+
+<div class="sub">
+MOVVI Charge
+</div>
+
+<div class="stats">
+
+<div class="box">
+<div>🟢 Livres</div>
+<div class="v" id="heroLivres">-</div>
+</div>
+
+<div class="box">
+<div>📅 Reserva</div>
+<div class="v" id="heroReserva">--:--</div>
+</div>
+
+</div>
+
+</div>
+
+<div class="panel">
+<div class="ph">
+<h2>Postos</h2>
+<span class="sub"><span id="updM"></span></span>
+</div>
+      <div id="listaPostos">A carregar…</div>
+      <div class="note">Liga o cabo ao carro. No fim toca em "Terminar e debitar".</div>
+    </div>
+    <div class="panel">
+      <div class="ph"><h2>Reservar posto</h2><span class="sub" id="dataHoje"></span></div>
+      <div id="calWrapper">A carregar…</div>
+    </div>
+    <div class="panel">
+      <div class="ph"><h2>Próxima reserva</h2></div>
+      <div id="proximaReserva" class="slot-card">
+        <div class="note">Sem reservas futuras.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ph"><h2>As minhas reservas</h2></div>
+      <div id="minhasRes">—</div>
+    </div>
+    <div class="panel">
+      <div class="ph"><h2>O meu extrato</h2></div>
+
+<div id="resumoSemana" class="slot-card" style="margin-bottom:12px"></div>
+
+<div id="meuExtrato">—</div>
+    </div>
+  </div>
+
+  <!-- VISTA GESTÃO -->
+  <div id="vGestao" class="hidden">
+    <div class="kpis">
+      <div class="kpi"><div class="l">Online</div><div class="v mono" id="kOnline">—</div></div>
+      <div class="kpi"><div class="l">Em carga</div><div class="v mono" id="kCarga">—</div></div>
+      <div class="kpi"><div class="l">Débitos semana</div><div class="v mono" id="kSemana">—</div></div>
+    </div>
+    <div id="secPostos" class="panel">
+      <div class="ph"><h2>Postos</h2><span class="sub" id="updG"></span></div>
+      <div id="gPostos">A carregar…</div>
+    </div>
+    <div id="secDebitos" class="panel hidden">
+      <div class="ph"><h2>Débitos</h2>
+        <button class="btn go sm" onclick="exportarCSV()">Exportar CSV</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table><thead><tr><th>Motorista</th><th>Viatura</th><th>Posto</th><th class="r">kWh</th><th class="r">Valor</th><th>Semana</th><th>Data</th><th>Tipo</th></tr></thead>
+        <tbody id="tDebitos"></tbody></table>
+      </div>
+    </div>
+    <div id="secReservas" class="panel hidden">
+      <div class="ph"><h2>Reservas</h2>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button class="btn go sm" onclick="filtrarReservas('hoje')">Hoje</button>
+          <button class="btn go sm" onclick="filtrarReservas('amanha')">Amanhã</button>
+          <button class="btn sm" style="background:#EFF1F0" onclick="filtrarReservas('todas')">Todas</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table><thead><tr><th>Motorista</th><th>Viatura</th><th>Posto</th><th>Data</th><th>Início</th><th>Fim</th><th>Dur.</th><th>Estado</th><th></th></tr></thead>
+        <tbody id="tReservas"></tbody></table>
+      </div>
+    </div>
+    <div id="secAtivos" class="panel hidden">
+      <div class="ph"><h2>Motoristas ativos hoje</h2><span class="sub" id="nAtivos"></span></div>
+      <div style="overflow-x:auto">
+        <table><thead><tr><th>Motorista</th><th>Viatura</th><th>Matrícula</th></tr></thead>
+        <tbody id="tAtivos"></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- VISTA PÚBLICA -->
+  <div id="vPublico" class="hidden">
+    <div class="panel">
+      <div class="ph"><h2>Disponibilidade</h2><span class="sub" id="updP"></span></div>
+      <div id="pubPostos">A carregar…</div>
+    </div>
+    <div class="panel">
+      <div class="ph"><h2>Reservas de hoje</h2></div>
+      <div id="pubSlots">—</div>
+    </div>
+    <div style="text-align:center;margin-top:8px">
+      <button class="btn go" onclick="irLogin()">Entrar para reservar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL RESERVA -->
+<div class="modal-bg hidden" id="modalBg">
+  <div class="modal">
+    <h3>Reservar posto</h3>
+    <p id="modalInfo" style="font-size:13px;color:var(--sub);margin-bottom:12px"></p>
+    <label style="font-size:12px;font-weight:600">Hora de início</label>
+    <select id="modalHora" style="margin-top:4px"></select>
+    <label style="font-size:12px;font-weight:600;margin-top:10px;display:block">Duração</label>
+    <select id="modalDur" style="margin-top:4px">
+      <option value="30">30 minutos</option>
+      <option value="60" selected>1 hora</option>
+      <option value="90">1h30</option>
+      <option value="120">2 horas</option>
+      <option value="150">2h30</option>
+      <option value="180">3 horas</option>
+    </select>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn stop" style="flex:1" onclick="fecharModal()">Cancelar</button>
+      <button class="btn go" style="flex:1" onclick="confirmarReserva()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div class="foot">
+  <div class="flogo">MO<span class="v1">V</span><span class="v2">V</span>I <span style="font-size:9px;letter-spacing:.3em">TVDE</span></div>
+  <div style="margin-top:3px">A frota mais moderna de Portugal</div>
+  <div style="margin-top:2px;font-size:11px">Sistema desenvolvido por <a href="https://adelmo.pt">adelmo.pt</a></div>
+</div>
+
+<script>
+const PRECO = 0.30;
+let PERFIL=localStorage.getItem("mc_perfil")||"";
+let KEY=localStorage.getItem("mc_key")||"";
+let DTOKEN=localStorage.getItem("mc_dtoken")||"";
+let EU=JSON.parse(localStorage.getItem("mc_eu")||"null");
+let timer=null, clockTimer=null, modalCharger=null;
+let SESSAO_INICIO = null; // timestamp local do início da sessão ativa
+
+const $=id=>document.getElementById(id);
+const H=()=>PERFIL==="admin"?{"X-Api-Key":KEY}:{"X-Driver-Token":DTOKEN};
+const api=(p,o={})=>fetch(p,{...o,headers:{...H(),...(o.headers||{})}})
+  .then(r=>{if(r.status===401){sair();throw 0;}return r.json();});
+
+function gtab(t){
+  ["m","g","p"].forEach(x=>{
+    $("gt"+x.toUpperCase()).classList.toggle("on",x===t);
+    $("login"+x.toUpperCase()).classList.toggle("hidden",x!==t);
+  });
+  $("gateErr").textContent="";
+}
+
+function gTab(v){
+  ["postos","debitos","ativos","reservas"].forEach(s=>{
+    const key=s.charAt(0).toUpperCase()+s.slice(1);
+    $("sec"+key).classList.toggle("hidden",s!==v);
+  });
+  document.querySelectorAll("[data-v]").forEach(t=>t.classList.toggle("on",t.dataset.v===v));
+  if(v==="ativos") carregarAtivos();
+  if(v==="debitos") carregarDebitos();
+  if(v==="reservas") carregarReservasGestao("todas");
+}
+
+function sair(){
+  ["mc_perfil","mc_key","mc_dtoken","mc_eu"].forEach(k=>localStorage.removeItem(k));
+  PERFIL=KEY=DTOKEN=""; EU=null;
+  clearInterval(timer); clearInterval(clockTimer);
+  $("gate").classList.remove("hidden");
+  $("whoBox").classList.add("hidden");
+  $("tabsGestao").classList.add("hidden");
+  ["vMotorista","vGestao","vPublico"].forEach(v=>$(v).classList.add("hidden"));
+}
+
+function irLogin(){
+  $("vPublico").classList.add("hidden");
+  $("gate").classList.remove("hidden");
+  gtab("m");
+}
+
+async function loginMotorista(){
+  $("gateErr").textContent="A verificar…";
+  const r=await fetch("/api/driver-login",{method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({email:$("lEmail").value,password:$("lPass").value})})
+    .then(x=>x.json()).catch(()=>null);
+  if(!r||!r.token){$("gateErr").textContent=(r&&r.erro)||"Falha no login.";return;}
+  PERFIL="driver"; DTOKEN=r.token; EU=r;
+  localStorage.setItem("mc_perfil",PERFIL);
+  localStorage.setItem("mc_dtoken",DTOKEN);
+  localStorage.setItem("mc_eu",JSON.stringify(EU));
+  entrar();
+}
+
+async function loginGestao(){
+  $("gateErr").textContent="";
+  KEY=$("lKey").value.trim();
+  const ok=await fetch("/api/debitos",{headers:{"X-Api-Key":KEY}}).then(r=>r.status===200).catch(()=>false);
+  if(!ok){$("gateErr").textContent="Chave incorreta.";return;}
+  PERFIL="admin";
+  localStorage.setItem("mc_perfil",PERFIL);
+  localStorage.setItem("mc_key",KEY);
+  entrar();
+}
+
+function verDisponibilidade(){
+  $("gate").classList.add("hidden"); $("vPublico").classList.remove("hidden");
+  atualizarPublico(); timer=setInterval(atualizarPublico,30000);
+}
+
+function entrar(){
+  $("gate").classList.add("hidden"); $("whoBox").classList.remove("hidden");
+  if(PERFIL==="driver"){
+    $("whoNome").innerHTML="<b>"+(EU.name||"")+"</b>";
+    if(EU.license_plate){
+      $("whoPlate").textContent=EU.license_plate+(EU.model?" · "+EU.model:"");
+      $("whoPlate").classList.remove("hidden");
+    }
+    $("vMotorista").classList.remove("hidden");
+    $("dataHoje").textContent=new Date().toLocaleDateString("pt-PT",{weekday:"long",day:"numeric",month:"long"});
+    // carregar calendário imediatamente após login
+    api("/api/chargers").then(ch=>{ if(Array.isArray(ch)) carregarCalendario(ch); });
+  } else {
+    $("whoNome").innerHTML="<b>Gestão</b>";
+    $("vGestao").classList.remove("hidden");
+    $("tabsGestao").classList.remove("hidden");
+  }
+  atualizar();
+  timer=setInterval(atualizar,5000); // 5s para manter kWh ao vivo
+}
+
+// ─── painel MIIO ──────────────────────────────────────────────────────────────
+function tempoDecorrido(inicioTs){
+  const s=Math.floor((Date.now()-inicioTs)/1000);
+  const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), ss=s%60;
+  return h>0?`${h}h ${String(m).padStart(2,"0")}min`:`${String(m).padStart(2,"0")}min ${String(ss).padStart(2,"0")}s`;
+}
+
+function renderMIIO(c){
+  if(!SESSAO_INICIO) SESSAO_INICIO=Date.now()-(c.sessionKwh/c.kwNow)*3600000||Date.now();
+  const painel=$("miioPanel");
+  painel.classList.remove("hidden");
+  painel.innerHTML=`
+  <div class="miio">
+    <div class="posto-tag"><span class="pulse"></span>${c.name.split(" SN")[0].toUpperCase()} · A CARREGAR</div>
+    <div class="kwh-big">${c.sessionKwh.toFixed(2)}<span>kWh</span></div>
+    <div class="eur-big">${(c.sessionKwh*PRECO).toFixed(2)} €</div>
+    <div class="stats">
+      <div><div class="stat-l">⚡ Potência</div><div class="stat-v kw">${c.kwNow.toFixed(1)} kW</div></div>
+      <div><div class="stat-l">⏱ Tempo</div><div class="stat-v time" id="clockDisplay">${tempoDecorrido(SESSAO_INICIO)}</div></div>
+      <div><div class="stat-l">💰 €/kWh</div><div class="stat-v">${PRECO.toFixed(2)}</div></div>
+    </div>
+    <div class="barra"><i></i></div>
+    <div class="info-row">
+      <span>Matrícula: ${EU&&EU.license_plate||"—"}</span>
+      <span>Posto: ${c.id}</span>
+    </div>
+    <button class="btn-stop" onclick="fechar(${c.id})">⏹ Terminar e debitar</button>
+  </div>`;
+  // relógio a contar ao segundo
+  clearInterval(clockTimer);
+  clockTimer=setInterval(()=>{
+    const el=$("clockDisplay");
+    if(el) el.textContent=tempoDecorrido(SESSAO_INICIO);
+    else clearInterval(clockTimer);
+  },1000);
+}
+
+// ─── status tags ─────────────────────────────────────────────────────────────
+const stTag=(c,myId)=>{
+  if(!c.online) return '<span class="st off">OFFLINE</span>';
+  if(c.charging){
+    if(c.sessao_driver_id===myId) return '<span class="st meu">A TUA SESSÃO</span>';
+    return '<span class="st chg">A CARREGAR</span>';
+  }
+  return '<span class="st on">DISPONÍVEL</span>';
+};
+
+// ─── atualizar ────────────────────────────────────────────────────────────────
+async function atualizar(){
+  let chargers;
+  try{chargers=await api("/api/chargers");}catch{return;}
+  if(!Array.isArray(chargers))return;
+  const hora=new Date().toLocaleTimeString("pt-PT",{hour:"2-digit",minute:"2-digit"});
+
+  if(PERFIL==="driver"){
+    
+$("updM").textContent="Atualizado às "+hora;
+
+const h=(new Date()).getHours();
+
+$("heroSaudacao").innerHTML=
+h<12?"☀️ Bom dia":
+h<19?"🌤 Boa tarde":
+"🌙 Boa noite";
+
+$("heroLivres").textContent=
+chargers.filter(c=>c.online&&!c.charging).length;
+
+if(typeof minhasRes!="undefined" && minhasRes && minhasRes.length){
+    $("heroReserva").textContent=minhasRes[0].inicio.slice(11,16);
+}else{
+    $("heroReserva").textContent="—";
+}
+
+    const minhaSessao=chargers.find(c=>c.charging&&c.sessao_driver_id===EU.driver_id);
+    if(minhaSessao){
+      renderMIIO(minhaSessao);
+    } else {
+      $("miioPanel").classList.add("hidden");
+      SESSAO_INICIO=null;
+      clearInterval(clockTimer);
+    }
+
+    $("listaPostos").innerHTML=chargers.map(c=>{
+      const mine=c.sessao_driver_id===EU.driver_id;
+      const outroNome=c.sessao_nome;
+      let btn="";
+      if(!c.online) btn=`<button class="btn" disabled>offline</button>`;
+      else if(c.charging&&mine) btn=`<button class="btn stop" onclick="fechar(${c.id})">Terminar e debitar</button>`;
+      else if(c.charging&&!mine) btn=`<span style="font:500 12px 'IBM Plex Mono';color:var(--sub)">Em uso · ${outroNome||""}</span>`;
+      else btn=`<button class="btn blue sm" onclick="abrirModal(${c.id},'${c.name.split(" SN")[0].replace(/'/g,"")}')">Reservar</button>`;
+      
+      const classe=!c.online?"offline":mine&&c.charging?"meu":c.charging?"ocupado":"disponivel";
+const pct=Math.min(100,(c.kwNow/22)*100);
+
+return `<div class="slot-card ${classe}">
+<div class="ttl">⚡ ${c.name.split(" SN")[0]}</div>
+<div class="st">${
+          mine && c.charging
+            ? `🔋 <b>A carregar</b><br><span style="font-size:12px;color:var(--sub)">Potência: ${c.kwNow.toFixed(1)} kW</span>`
+            : (c.charging
+                ? `🔒 <b>Em utilização</b>`
+                : `🟢 <b>Disponível</b>`)
+        }
+
+${mine&&c.charging?`
+<div class="power">
+<div style="width:${pct}%"></div>
+</div>
+<div style="margin-top:6px;font-size:12px;color:#64748B">
+${c.kwNow.toFixed(1)} / 22 kW
+</div>`:""}
+
+</div>
+
+<div class='act'>
+${btn}
+</div>
+
+</div>`;
+
+    }).join("")||"Sem postos.";
+
+
+    const my=await api("/api/my").catch(()=>null);
+    if(my){
+
+      const totalKwh=my.debitos.reduce((a,d)=>a+(d.kwh||0),0);
+      const totalEuro=my.debitos.reduce((a,d)=>a+(d.valor||0),0);
+
+      $("dashLivres").textContent=
+          chargers.filter(c=>c.online&&!c.charging).length;
+
+      $("dashKwh").textContent=
+          totalKwh.toFixed(1)+" kWh";
+
+      $("dashEuro").textContent=
+          totalEuro.toFixed(2)+" €";
+
+      if(minhasRes && minhasRes.length)
+          $("dashReserva").textContent=minhasRes[0].inicio.slice(11,16);
+      else
+          $("dashReserva").textContent="—";
+
+      $("resumoSemana").innerHTML=`
+<div class="ttl">📊 Esta semana</div>
+
+<div style="display:flex;justify-content:space-between;margin-top:10px">
+<span>⚡ Energia</span>
+<b>${totalKwh.toFixed(1)} kWh</b>
+</div>
+
+<div style="display:flex;justify-content:space-between;margin-top:8px">
+<span>💶 Total</span>
+<b>${totalEuro.toFixed(2)} €</b>
+</div>
+
+<div style="display:flex;justify-content:space-between;margin-top:8px">
+<span>🔌 Carregamentos</span>
+<b>${my.debitos.length}</b>
+</div>
+`;
+
+      $("meuExtrato").innerHTML=my.debitos.length?my.debitos.map(d=>`
+        <div class="slot" style="padding:10px 12px">
+          <div>
+            <div class="nm">${(d.charger||"").split(" SN")[0]}${d.auto?' <span style="font-size:10px;color:var(--sub)">(auto)</span>':""}</div>
+            <div class="det">${d.kwh.toFixed(1)} kWh · ${d.license_plate||""} · semana ${d.semana}</div>
+          </div>
+          <div class="mono" style="font-weight:600;font-size:15px">${d.valor.toFixed(2)} €</div>
+        </div>`).join(""):'<div class="note">Ainda sem carregamentos.</div>';
+
+      const minhasRes=await api("/api/reservas").catch(()=>null);
+
+      if(minhasRes && minhasRes.length){
+
+        const prox=minhasRes
+          .slice()
+          .sort((a,b)=>a.inicio.localeCompare(b.inicio))[0];
+
+        const ini=new Date(prox.inicio.replace(" ","T"));
+        const agora=new Date();
+
+        const diff=Math.floor((ini-agora)/60000);
+
+        let estado="";
+
+        if(diff>15){
+            estado=`⏳ Começa em ${diff} minutos`;
+        }else if(diff>=0){
+            estado="🟢 Já pode iniciar o carregamento";
+        }else{
+            estado="🔋 Reserva em curso";
+        }
+
+        $("proximaReserva").innerHTML=`
+            <div class="ttl">⚡ ${(prox.charger_nome||"").split(" SN")[0]}</div>
+
+            <div style="margin:8px 0;font-size:15px">
+                ${prox.inicio.slice(11,16)} – ${prox.fim.slice(11,16)}
+            </div>
+
+            <div style="font-weight:600;color:#2563EB">
+                ${estado}
+            </div>
+        `;
+
+      }else{
+        $("proximaReserva").innerHTML='<div class="note">Sem reservas futuras.</div>';
+      }
+
+      $("minhasRes").innerHTML=minhasRes&&minhasRes.length?minhasRes.map(r=>`
+        <div class="slot" style="padding:10px 12px">
+          <div>
+            <div class="nm">${(r.charger_nome||"").split(" SN")[0]}</div>
+            <div class="det">${r.inicio.slice(11,16)} – ${r.fim.slice(11,16)} · ${r.duracao_min} min</div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn blue sm" onclick="checkin(${r.id})">Check-in</button>
+            <button class="btn stop sm" onclick="cancelarRes(${r.id})">Cancelar</button>
+          </div>
+        </div>`).join(""):'<div class="note">Sem reservas ativas.</div>';
+    }
+
+  } else {
+    // gestão
+    $("updG").textContent="atualizado "+hora;
+    $("kOnline").textContent=chargers.filter(c=>c.online).length+" / "+chargers.length;
+    $("kCarga").textContent=chargers.filter(c=>c.charging).length;
+    $("gPostos").innerHTML=chargers.map(c=>{
+      const sess=c.sessao_nome;
+      const btn=sess?`<button class="btn stop sm" onclick="fecharGestao(${c.id})">Terminar</button>`:"";
+      return `<div class="slot"><div>
+        <div class="nm">${c.name} ${stTag(c,null)}</div>
+        <div class="det">${c.kwNow.toFixed(2)} kW · ${c.sessionKwh.toFixed(2)} kWh · ${(c.sessionKwh*PRECO).toFixed(2)} €${sess?" · "+sess:""}</div>
+      </div>${btn}</div>`;
+    }).join("");
+    const deb=await api("/api/debitos").catch(()=>[]);
+    const semana=getSemana();
+    $("kSemana").textContent=deb.filter(d=>d.semana===semana).reduce((a,d)=>a+(d.valor||0),0).toFixed(2)+" €";
+  }
+}
+
+async function atualizarPublico(){
+  const hora=new Date().toLocaleTimeString("pt-PT",{hour:"2-digit",minute:"2-digit"});
+  $("updP").textContent="atualizado "+hora;
+  const ch=await fetch("/api/chargers/public").then(r=>r.json()).catch(()=>[]);
+  $("pubPostos").innerHTML=ch.map(c=>`<div class="slot"><div>
+    <div class="nm">${c.name.split(" SN")[0]} ${c.charging?'<span class="st chg">A CARREGAR</span>':c.online?'<span class="st on">DISPONÍVEL</span>':'<span class="st off">OFFLINE</span>'}</div>
+    <div class="det">${c.charging&&c.ocupado_por?"Em uso · "+c.ocupado_por:c.online?"Livre":"Indisponível"}</div>
+  </div></div>`).join()||"Sem postos.";
+  const hoje=new Date().toISOString().slice(0,10);
+  const slots=await fetch(`/api/slots?data=${hoje}`).then(r=>r.json()).catch(()=>[]);
+  $("pubSlots").innerHTML=slots.length?slots.map(s=>`
+    <div class="slot" style="padding:10px 12px">
+      <div><div class="nm">${(s.charger_nome||"").split(" SN")[0]}</div>
+      <div class="det">${s.inicio.slice(11,16)} – ${s.fim.slice(11,16)} · ${s.driver_nome}</div></div>
+      <span class="mono" style="font-size:11px;color:var(--sub)">${s.duracao_min} min</span>
+    </div>`).join():'<div class="note">Sem reservas para hoje.</div>';
+}
+
+async function carregarCalendario(chargers){
+  if(!chargers||!chargers.length){
+    try{chargers=await api("/api/chargers");}catch{return;}
+  }
+  const agora=new Date();
+  const hoje=agora.toISOString().slice(0,10);
+  const amanha=new Date(agora.getTime()+86400000).toISOString().slice(0,10);
+  const [sH,sA]=await Promise.all([
+    fetch("/api/slots?data="+hoje,{headers:H()}).then(r=>r.json()).catch(()=>[]),
+    fetch("/api/slots?data="+amanha,{headers:H()}).then(r=>r.json()).catch(()=>[])
+  ]);
+  const cols="50px "+Array(chargers.length).fill("1fr").join(" ");
+  function hLabel(c){return c.name.split(" SN")[0].replace("MOVVI ","M");}
+
+  function buildDia(label, data, slots, filtrarPassado){
+    const d=new Date(data+"T12:00:00");
+    const titulo=d.toLocaleDateString("pt-PT",{weekday:"long",day:"numeric",month:"long"});
+    const horas=[];
+    for(let h=0;h<23;h++){horas.push(String(h).padStart(2,"0")+":00");horas.push(String(h).padStart(2,"0")+":30");}
+    let linhas="", temSlots=false;
+    horas.forEach(h=>{
+      const sd=new Date(data+"T"+h+":00");
+      if(filtrarPassado&&sd<agora)return;
+      temSlots=true;
+      let cells="";
+      chargers.forEach(c=>{
+        const res=slots.find(x=>{
+          if(x.charger_id!==c.id)return false;
+          const ini=new Date(x.inicio);
+          const fim=new Date(x.fim);
+          const slot=new Date(data+"T"+h+":00");
+          return slot>=ini && slot<fim;
+        });
+        if(res){const minha=EU&&res.driver_id===EU.driver_id;cells+=`<div class="cal-cell ${minha?"minha":"ocupado"}">${minha?"✓":res.driver_nome.split(" ")[0]}</div>`;}
+        else cells+=`<div class="cal-cell livre" onclick="abrirModal(${c.id},'${hLabel(c).replace(/'/g,"")}','${h}','${data}')">+</div>`;
+      });
+      linhas+=`<div class="cal-row" style="grid-template-columns:${cols}"><span class="cal-hora">${h}</span>${cells}</div>`;
+    });
+    if(!temSlots) linhas=`<div style="text-align:center;color:var(--sub);font-size:12px;padding:12px">Sem slots disponíveis.</div>`;
+    return `<div style="margin-bottom:14px">
+      <div style="font:700 13px 'Archivo';padding:10px 0 6px;border-bottom:2px solid var(--ink);margin-bottom:6px;text-transform:capitalize">${label} · ${titulo}</div>
+      <div class="cal-header" style="grid-template-columns:${cols}"><span></span>${chargers.map(c=>`<span>${hLabel(c)}</span>`).join("")}</div>
+      ${linhas}
+    </div>`;
+  }
+
+  $("calWrapper").innerHTML=buildDia("Hoje",hoje,sH,true)+buildDia("Amanhã",amanha,sA,false);
+}
+
+let _filtroRes="hoje";
+function filtrarReservas(f){_filtroRes=f;carregarReservasGestao(f);}
+
+async function carregarReservasGestao(filtro){
+  _filtroRes=filtro||_filtroRes;
+  const hoje=new Date().toISOString().slice(0,10);
+  const amanha=new Date(Date.now()+86400000).toISOString().slice(0,10);
+  let url="/api/reservas/todas";
+  const res=await api(url).catch(()=>[]);
+  if(!Array.isArray(res))return;
+  let filtradas=res;
+  if(_filtroRes==="hoje") filtradas=res.filter(r=>r.inicio.slice(0,10)===hoje);
+  else if(_filtroRes==="amanha") filtradas=res.filter(r=>r.inicio.slice(0,10)===amanha);
+  const cores={confirmada:"#E4F2EA;color:#146B3A",checkin:"#DBEAFE;color:#1D4ED8",cancelada:"#FBE7E4;color:#C42B1F",concluida:"#EFF1F0;color:#5C6663",no_show:"#F7F0DC;color:#8A6D1A"};
+  $("tReservas").innerHTML=filtradas.length?filtradas.map(r=>{
+    const cor=cores[r.estado]||"#EFF1F0;color:#5C6663";
+    return `<tr>
+      <td style="font-weight:600">${r.driver_nome||"—"}</td>
+      <td class="mono">${r.license_plate||"—"}</td>
+      <td>${(r.charger_nome||"").split(" SN")[0]}</td>
+      <td class="mono">${r.inicio.slice(0,10)}</td>
+      <td class="mono">${r.inicio.slice(11,16)}</td>
+      <td class="mono">${r.fim.slice(11,16)}</td>
+      <td class="mono">${r.duracao_min}min</td>
+      <td><span style="font:600 10px 'IBM Plex Mono';padding:3px 8px;border-radius:20px;background:${cor.split(";")[0]};${cor.split(";")[1]}">${r.estado.toUpperCase()}</span></td>
+      <td>${r.estado==="confirmada"?`<button class="btn stop sm" onclick="cancelarResGestao(${r.id})">Cancelar</button>`:""}
+          ${r.estado==="confirmada"?`<button class="btn go sm" onclick="noShowRes(${r.id})" style="margin-left:4px">No-show</button>`:""}</td>
+    </tr>`;}).join("")
+    :'<tr><td colspan="9" style="color:var(--sub);text-align:center;padding:20px">Sem reservas para este período.</td></tr>';
+}
+
+async function cancelarResGestao(rid){
+  if(!confirm("Cancelar esta reserva?"))return;
+  await api(`/api/reservas/${rid}`,{method:"DELETE"}).catch(()=>null);
+  carregarReservasGestao();
+}
+
+async function noShowRes(rid){
+  if(!confirm("Marcar como no-show (motorista não apareceu)?"))return;
+  await api(`/api/reservas/${rid}/noshow`,{method:"POST"}).catch(()=>null);
+  carregarReservasGestao();
+}
+
+async function carregarAtivos(){
+  const a=await api("/api/active").catch(()=>[]);
+  if(!Array.isArray(a))return;
+  $("nAtivos").textContent=a.length+" hoje";
+  $("tAtivos").innerHTML=a.map(x=>`<tr><td style="font-weight:600">${x.name}</td><td>${x.model||"—"}</td><td class="mono">${x.license_plate||"—"}</td></tr>`).join("");
+}
+
+async function carregarDebitos(){
+  const deb=await api("/api/debitos").catch(()=>[]);
+  $("tDebitos").innerHTML=deb.slice(0,60).map(d=>`<tr>
+    <td style="font-weight:600">${d.driver_nome||d.driver_id}</td>
+    <td class="mono">${d.license_plate||"—"}</td>
+    <td>${(d.charger_nome||"").split(" SN")[0]}</td>
+    <td class="r mono">${(d.kwh||0).toFixed(1)}</td>
+    <td class="r mono" style="font-weight:600">${(d.valor||0).toFixed(2)} €</td>
+    <td class="mono">${d.semana||""}</td>
+    <td style="color:var(--sub)">${(d.fim||"").slice(0,16)}</td>
+    <td>${d.auto?'<span style="color:var(--grn);font-size:10px;font-weight:600">AUTO</span>':"Manual"}</td>
+  </tr>`).join("")||'<tr><td colspan="8" style="color:var(--sub)">Sem débitos.</td></tr>';
+}
+
+function abrirModal(cid,cNome,hora="",data=""){
+  const hoje=new Date().toISOString().slice(0,10);
+  const amanha=new Date(Date.now()+86400000).toISOString().slice(0,10);
+  // se não passou data, perguntar qual dia
+  if(!data){
+    const escolha=confirm("Reservar para HOJE?\nCancelar = Amanhã");
+    data=escolha?hoje:amanha;
+  }
+  modalCharger={id:cid,nome:cNome,data:data};
+  const eHoje=data===hoje;
+  $("modalInfo").textContent=`Posto: ${cNome} · ${eHoje?"Hoje":"Amanhã"}`;
+  const sel=$("modalHora"); sel.innerHTML="";
+  const agora=new Date();
+  for(let h=0;h<23;h++){
+    for(let m of[0,30]){
+      const sd=new Date(data+"T"+String(h).padStart(2,"0")+":"+String(m).padStart(2,"0")+":00");
+      if(eHoje&&sd<agora)continue;
+      const v=String(h).padStart(2,"0")+":"+String(m).padStart(2,"0");
+      const opt=document.createElement("option");
+      opt.value=v; opt.textContent=v;
+      const presel=hora||(eHoje?"":"10:00");
+      if(v===presel)opt.selected=true;
+      sel.appendChild(opt);
+    }
+  }
+  $("modalBg").classList.remove("hidden");
+}
+
+function fecharModal(){$("modalBg").classList.add("hidden");modalCharger=null;}
+
+async function confirmarReserva(){
+  if(!modalCharger)return;
+  const hora=$("modalHora").value, dur=parseInt($("modalDur").value);
+  const data=modalCharger.data||new Date().toISOString().slice(0,10);
+  const r=await api("/api/reservas",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({charger_id:modalCharger.id,inicio:`${data}T${hora}`,duracao_min:dur})})
+    .catch(()=>null);
+  fecharModal();
+  if(r&&r.ok) alert(`✅ Reserva confirmada!\n${r.inicio} – ${r.fim} · ${modalCharger?modalCharger.nome:""}`);
+  else alert("Erro: "+((r&&r.erro)||"desconhecido"));
+  atualizar();
+  api('/api/chargers').then(ch=>{ if(Array.isArray(ch)) carregarCalendario(ch); });
+}
+
+async function fechar(id){
+  if(!confirm("Terminar sessão e debitar na tua conta?"))return;
+  const r=await api(`/api/debitos/fechar/${id}`,{method:"POST"}).catch(()=>null);
+  if(r&&r.ok){
+    SESSAO_INICIO=null; clearInterval(clockTimer);
+    alert(`✅ Debitado!\n${r.kwh.toFixed(2)} kWh = ${r.valor.toFixed(2)} €\nSemana ${r.semana}`);
+  } else alert("Erro: "+((r&&r.erro)||"desconhecido"));
+  atualizar();
+}
+
+async function fecharGestao(id){
+  const did=prompt("ID do motorista (ver tabela Ativos):");
+  if(!did)return;
+  const r=await api(`/api/debitos/fechar/${id}?driver_id=${did}`,{method:"POST"}).catch(()=>null);
+  if(r&&r.ok) alert(`✅ ${r.driver}\n${r.kwh.toFixed(2)} kWh = ${r.valor.toFixed(2)} €`);
+  else alert("Erro: "+((r&&r.erro)||"desconhecido"));
+  atualizar();
+}
+
+async function checkin(rid){
+  const r=await api(`/api/reservas/${rid}/checkin`,{method:"POST"}).catch(()=>null);
+  if(r&&r.ok){SESSAO_INICIO=Date.now();alert(r.msg||"✅ Check-in feito! Liga o cabo.");}
+  else alert("Erro: "+((r&&r.erro)||"desconhecido"));
+  atualizar();
+}
+
+async function cancelarRes(rid){
+  if(!confirm("Cancelar reserva?"))return;
+  await api(`/api/reservas/${rid}`,{method:"DELETE"}).catch(()=>null);
+  atualizar();
+}
+
+function getSemana(){
+  const d=new Date(),j=new Date(d.getFullYear(),0,4);
+  const w=Math.round(((d-j)/864e5-3+((j.getDay()+6)%7))/7)+1;
+  return d.getFullYear()+"-W"+String(w).padStart(2,"0");
+}
+
+function exportarCSV(){
+  fetch(`/api/debitos/export?semana=${getSemana()}`,{headers:H()})
+    .then(r=>r.blob()).then(b=>{
+      const a=document.createElement("a");
+      a.href=URL.createObjectURL(b);
+      a.download=`debitos_${getSemana()}.csv`;
+      a.click();
+    });
+}
+
+if(PERFIL==="admin"&&KEY) entrar();
+else if(PERFIL==="driver"&&DTOKEN) entrar();
+</script>
+</body>
+</html>
