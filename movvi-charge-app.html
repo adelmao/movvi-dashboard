@@ -743,6 +743,7 @@ ${btn}
           </div>
         </div>`).join(""):'<div class="note">Sem reservas ativas.</div>';
     }
+    await carregarCalendario(chargers);
 
   } else {
     // gestão
@@ -932,10 +933,14 @@ async function confirmarReserva(){
     body:JSON.stringify({charger_id:modalCharger.id,inicio:`${data}T${hora}`,duracao_min:dur})})
     .catch(()=>null);
   fecharModal();
-  if(r&&r.ok) alert(`✅ Reserva confirmada!\n${r.inicio} – ${r.fim} · ${modalCharger?modalCharger.nome:""}`);
-  else alert("Erro: "+((r&&r.erro)||"desconhecido"));
-  atualizar();
-  api('/api/chargers').then(ch=>{ if(Array.isArray(ch)) carregarCalendario(ch); });
+  if(r&&r.ok){
+    await atualizar();
+    const ch=await api('/api/chargers').catch(()=>null);
+    if(Array.isArray(ch)) carregarCalendario(ch);
+    alert(`✅ Reserva confirmada!\n${r.inicio} – ${r.fim} · ${modalCharger?modalCharger.nome:""}`);
+  }else{
+    alert("Erro: "+((r&&r.erro)||"desconhecido"));
+  }
 }
 
 async function fechar(id){
