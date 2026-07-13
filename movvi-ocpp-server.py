@@ -32,7 +32,7 @@ logging.basicConfig(level=logging.INFO,
     datefmt='%H:%M:%S')
 log = logging.getLogger("ocpp")
 
-DB_PATH   = "/opt/tvde/tvde_data.db"
+DB_PATH   = "/opt/tvde/movvi_charge.db"
 PRECO_KWH = 0.30
 PORT      = 9000
 
@@ -127,6 +127,61 @@ async def handle_message(charger_id, ws, raw):
             status = payload.get("status","")
             CHARGERS.setdefault(charger_id, {})["status"] = status
             log.info(f"[STATUS] {charger_id} → {status}")
+            # check-in automático quando cabo é ligado
+            if status == "Available":
+                # cabo desligado — finalizar sessão ativa se existir
+                try:
+                    ch = CHARGERS.get(charger_id, {})
+                    trans_id = ch.get("transaction_id")
+                    if trans_id:
+                        kwh_fim = ch.get("kwh_atual", ch.get("kwh_inicio", 0))
+                        kwh = kwh_fim - ch.get("kwh_inicio", 0)
+                        gravar_debito(
+                            ch.get("driver_id", 0), ch.get("driver_nome", "Desconhecido"),
+                            ch.get("license_plate", ""), charger_id, kwh)
+                        c = db()
+                        c.execute("""UPDATE ocpp_sessions SET kwh_fim=?,
+                            fim=datetime('now','localtime'), estado='concluida'
+                            WHERE transaction_id=?""", (kwh_fim, trans_id))
+                        c.commit()
+                        for k in ["transaction_id","kwh_inicio","kwh_atual","driver_id","driver_nome","license_plate"]:
+                            ch.pop(k, None)
+                        TRANS.pop(trans_id, None)
+                        log.info(f"[AUTO STOP] {charger_id} cabo desligado → débito {kwh:.2f} kWh")
+                except Exception as e:
+                    log.error(f"[AUTO STOP] erro: {e}")
+            if status == "Preparing":
+                try:
+                    from datetime import datetime, timedelta
+                    agora = datetime.now()
+                    janela_ini = (agora - timedelta(minutes=15)).isoformat()
+                    janela_fim = (agora + timedelta(minutes=15)).isoformat()
+                    # descobrir charger_id Wallbox a partir do OCPP id
+                    wb_id = None
+                    for cid, cinfo in CHARGERS.items():
+                        if cid == charger_id:
+                            wb_id = cinfo.get("wallbox_id")
+                    # buscar reserva activa para este posto
+                    c = db()
+                    # buscar reserva activa agora (inicio <= agora <= fim)
+                    agora_str = agora.strftime("%Y-%m-%dT%H:%M:%S")
+                    row = c.execute("""SELECT id, driver_id, driver_nome, license_plate, charger_id
+                        FROM reservas
+                        WHERE estado IN ('confirmada','checkin')
+                        AND inicio <= ? AND fim >= ?
+                        ORDER BY inicio ASC LIMIT 1""",
+                        (agora_str, agora_str)).fetchone()
+                    if row:
+                        rid, did, dnome, plate, cid_num = row
+                        ch = CHARGERS.setdefault(charger_id, {})
+                        ch["driver_id"] = did
+                        ch["driver_nome"] = dnome
+                        ch["license_plate"] = plate
+                        c.execute("UPDATE reservas SET estado='checkin' WHERE id=?", (rid,))
+                        c.commit()
+                        log.info(f"[AUTO CHECK-IN] {charger_id} → {dnome} reserva={rid}")
+                except Exception as e:
+                    log.error(f"[AUTO CHECK-IN] erro: {e}")
             await ws.send(json.dumps([3, uid, {}]))
 
         elif action == "Authorize":

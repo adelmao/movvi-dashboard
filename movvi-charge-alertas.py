@@ -42,7 +42,7 @@ EMAIL_HOST    = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
 EMAIL_PORT    = int(os.environ.get("EMAIL_PORT", "587"))
 EMAIL_USER    = os.environ.get("EMAIL_USER", "")
 EMAIL_PASS    = os.environ.get("EMAIL_PASS", "")
-DB_PATH       = "/opt/tvde/tvde_data.db"
+DB_PATH       = "/opt/tvde/movvi_charge.db"
 VEL_MEDIA_KMH = 28  # velocidade urbana estimada Porto
 
 # ─── controlo de alertas já enviados ─────────────────────────────────────────

@@ -34,15 +34,15 @@ log = logging.getLogger("alertas")
 POSTO_LAT   = float(os.environ.get("POSTO_LAT", "41.1579"))
 POSTO_LON   = float(os.environ.get("POSTO_LON", "-8.6291"))
 POSTO_MORADA = os.environ.get("POSTO_MORADA", "Parque Movvi TVDE")
-CARTRACK_USER = os.environ.get("CARTRACK_USER", "")
-CARTRACK_PASS = os.environ.get("CARTRACK_PASS", "")
+CARTRACK_USER = os.environ.get("CARTRACK_USER", "ADEL00005")
+CARTRACK_PASS = os.environ.get("CARTRACK_PASS", os.environ.get("CARTRACK_PASSWORD", ""))
 WA_TOKEN      = os.environ.get("WA_TOKEN", "")
 WA_PHONE_ID   = os.environ.get("WA_PHONE_ID", "")
 EMAIL_HOST    = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
 EMAIL_PORT    = int(os.environ.get("EMAIL_PORT", "587"))
 EMAIL_USER    = os.environ.get("EMAIL_USER", "")
 EMAIL_PASS    = os.environ.get("EMAIL_PASS", "")
-DB_PATH       = "/opt/tvde/tvde_data.db"
+DB_PATH       = "/opt/tvde/movvi_charge.db"
 VEL_MEDIA_KMH = 28  # velocidade urbana estimada Porto
 
 # ─── controlo de alertas já enviados ─────────────────────────────────────────
@@ -79,44 +79,82 @@ def ct_token():
 
 def posicao_viatura(license_plate):
     """Devolve (lat, lon) da viatura pelo Cartrack, ou None."""
-    if not CARTRACK_USER:
-        return None
-    tok = ct_token()
-    if not tok:
-        return None
     try:
-        # endpoint de veículos — ajustar conforme API Cartrack real
-        r = requests.get("https://api.cartrack.pt/v1/vehicles",
-                         headers={"Authorization": f"Bearer {tok}"},
-                         timeout=15)
-        veiculos = r.json() if r.status_code == 200 else []
+        import base64
+        cred = base64.b64encode(f"{CARTRACK_USER}:{CARTRACK_PASS}".encode()).decode()
+        headers = {"Authorization": f"Basic {cred}"}
+        r = requests.get("https://fleetapi-pt.cartrack.com/rest/vehicles/status",
+                         headers=headers, timeout=15)
+        if r.status_code != 200:
+            return None
+        data = r.json()
+        veiculos = data if isinstance(data, list) else data.get("data", [])
+        placa = license_plate.replace("-","").upper()
         veh = next((v for v in veiculos
-                    if v.get("license_plate","").replace("-","").upper() == license_plate.replace("-","").upper()), None)
+                    if v.get("registration","").replace("-","").upper() == placa), None)
         if not veh:
             return None
-        vid = veh.get("id") or veh.get("vehicle_id")
-        r2 = requests.get(f"https://api.cartrack.pt/v1/vehicles/{vid}/position",
-                          headers={"Authorization": f"Bearer {tok}"},
-                          timeout=15)
-        if r2.status_code == 200:
-            d = r2.json()
-            lat = d.get("latitude") or d.get("lat") or (d.get("position") or {}).get("lat")
-            lon = d.get("longitude") or d.get("lon") or (d.get("position") or {}).get("lon")
-            return (float(lat), float(lon)) if lat and lon else None
+        loc = veh.get("location", {})
+        lat = loc.get("latitude")
+        lon = loc.get("longitude")
+        return (float(lat), float(lon)) if lat and lon else None
     except Exception as e:
         log.error(f"Cartrack error: {e}")
     return None
 
 # ─── notificações ─────────────────────────────────────────────────────────────
+def _limpar_numero(phone):
+    num = phone.replace("+","").replace(" ","").replace("-","")
+    if not num.startswith("351"):
+        num = "351" + num
+    return num
+
+def enviar_whatsapp_template(phone, nome, hora, posto, km, minutos, maps_url, cancel_url):
+    """Envia via template aprovado — funciona sem interacao previa das 24h."""
+    if not WA_TOKEN or not WA_PHONE_ID or not phone:
+        return False
+    num = _limpar_numero(phone)
+    km_str = f"{km:.1f}" if km else "?"
+    min_str = str(minutos) if minutos else "?"
+    try:
+        r = requests.post(
+            f"https://graph.facebook.com/v19.0/{WA_PHONE_ID}/messages",
+            headers={"Authorization": f"Bearer {WA_TOKEN}", "Content-Type": "application/json"},
+            json={
+                "messaging_product": "whatsapp",
+                "to": num,
+                "type": "template",
+                "template": {
+                    "name": "movvi_charge_lembrete",
+                    "language": {"code": "pt_PT"},
+                    "components": [{
+                        "type": "body",
+                        "parameters": [
+                            {"type": "text", "text": nome.split()[0]},
+                            {"type": "text", "text": hora},
+                            {"type": "text", "text": posto},
+                            {"type": "text", "text": km_str},
+                            {"type": "text", "text": min_str},
+                            {"type": "text", "text": maps_url},
+                            {"type": "text", "text": cancel_url},
+                        ]
+                    }]
+                }
+            },
+            timeout=15)
+        ok = r.status_code == 200
+        if not ok: log.warning(f"WA template erro {r.status_code}: {r.text[:100]}")
+        return ok
+    except Exception as e:
+        log.error(f"WA template exception: {e}")
+        return False
+
 def enviar_whatsapp(phone, mensagem):
-    """Envia mensagem WhatsApp Business."""
+    """Envia mensagem WhatsApp livre (fallback — so funciona dentro de 24h)."""
     if not WA_TOKEN or not WA_PHONE_ID or not phone:
         log.info(f"[WA simulado] {phone}: {mensagem[:60]}")
         return False
-    # limpar número
-    num = "351" + phone.replace("+351","").replace(" ","").replace("-","")
-    if not num.startswith("351"):
-        num = "351" + num
+    num = _limpar_numero(phone)
     try:
         r = requests.post(
             f"https://graph.facebook.com/v19.0/{WA_PHONE_ID}/messages",
@@ -151,11 +189,13 @@ def enviar_email(para, assunto, corpo):
 
 # ─── alerta principal ─────────────────────────────────────────────────────────
 BASE_URL = os.environ.get("CHARGE_BASE_URL", "https://charge.movvi.com.pt")
+MAPS_URL = f"https://www.google.com/maps/dir/?api=1&destination={os.environ.get('POSTO_LAT','41.1187')},{os.environ.get('POSTO_LON','-8.5981')}&travelmode=driving" 
 
 def montar_mensagem(nome, posto, hora_inicio, hora_fim, km, minutos, placa, cancel_token=None):
     cancel_linha = ""
     if cancel_token:
         cancel_linha = f"\n❌ Cancelar reserva: {BASE_URL}/cancelar/{cancel_token}"
+    maps_linha = f"\n🗺️ Como chegar: {MAPS_URL}"
 
     if km is None:
         return (
@@ -178,6 +218,7 @@ def montar_mensagem(nome, posto, hora_inicio, hora_fim, km, minutos, placa, canc
         f"🚗 Estás a {km:.1f} km do posto\n"
         f"⏱ Tempo estimado: {minutos} min\n\n"
         f"{urgencia}"
+        f"{maps_linha}"
         f"{cancel_linha}\n\n"
         f"— Movvi Charge · adelmo.pt"
     )
@@ -215,45 +256,54 @@ def verificar_alertas(db_path):
 
         # gerar token de cancelamento
         try:
-            import sys; sys.path.insert(0, '/opt/tvde')
-            from movvi_charge_server import gerar_cancel_token
-            cancel_tok = gerar_cancel_token(rid)
-        except:
+            import secrets, sqlite3 as _sq
+            cancel_tok = secrets.token_urlsafe(20)
+            _c = _sq.connect(db_path)
+            _c.execute("INSERT OR REPLACE INTO cancel_tokens (token, reserva_id) VALUES (?,?)",
+                      (cancel_tok, rid))
+            _c.commit()
+            _c.close()
+        except Exception as _e:
+            log.error(f"cancel_token erro: {_e}")
             cancel_tok = None
         msg = montar_mensagem(nome, posto_curto, hora_i, hora_f,
                                km_dist, minutos_viagem, placa or "—", cancel_tok)
 
-        # tentar ir buscar contacto do motorista ao GesTVDE
-        # (simplificado — usa dados da reserva; em produção chamar /api/v1/drivers)
+        # buscar contacto na movvi_charge.db (sync diario da tvde_data.db)
         phone = None
         email = None
         try:
-            import requests as req
-            MOVVI_TOK = _get_movvi_token()
-            if MOVVI_TOK:
-                UA = "Mozilla/5.0 (Windows NT 10.0)"
-                r = req.get(f"https://movvi.com.pt/api/v1/drivers",
-                            params={"per_page": 300},
-                            headers={"Authorization": f"Bearer {MOVVI_TOK}",
-                                     "Accept": "application/json",
-                                     "User-Agent": UA},
-                            timeout=15)
-                if r.status_code == 200:
-                    todos = r.json().get("data", [])
-                    meu = next((d for d in todos if d["id"] == did), None)
-                    if meu:
-                        phone = meu.get("phone")
-                        email = meu.get("email") or (meu.get("user") or {}).get("email")
-        except: pass
+            import sqlite3 as _sq
+            c2 = _sq.connect(db_path)
+            row = c2.execute("""
+                SELECT email, telefone FROM motoristas_contactos
+                WHERE movvi_driver_id=? AND ativo=1 LIMIT 1""",
+                (str(did),)).fetchone()
+            c2.close()
+            if row:
+                email = row[0] if row[0] else None
+                phone = row[1] if row[1] else None
+        except Exception as e:
+            log.error(f"Erro a buscar contacto: {e}")
 
         enviou = False
-        if phone: enviou |= enviar_whatsapp(phone, msg)
+        cancel_url = f"{BASE_URL}/cancelar/{cancel_tok}" if cancel_tok else BASE_URL
+        maps_url = MAPS_URL
+        if phone:
+            # tentar template primeiro (sem restricao 24h), fallback para mensagem livre
+            ok_template = enviar_whatsapp_template(
+                phone, nome, hora_i, posto_curto,
+                km_dist, minutos_viagem, maps_url, cancel_url)
+            if not ok_template:
+                enviou |= enviar_whatsapp(phone, msg)
+            else:
+                enviou = True
         if email: enviou |= enviar_email(email, f"⚡ Carregamento às {hora_i} — Movvi Charge", msg)
 
         if not phone and not email:
             log.warning(f"[ALERTA] sem contacto para {nome} (id={did}) — reserva {rid}")
         else:
-            log.info(f"[ALERTA] {nome} · {posto_curto} {hora_i} · {km_dist:.1f if km_dist else '?'}km · WA:{phone} Email:{email}")
+            log.info(f"[ALERTA] {nome} · {posto_curto} {hora_i} · {f'{km_dist:.1f}' if km_dist else '?'}km · WA:{phone} Email:{email}")
 
         _alertas_enviados.add(rid)
 
@@ -275,6 +325,56 @@ def _get_movvi_token():
     return None
 
 # ─── loop de monitorização ────────────────────────────────────────────────────
+
+def verificar_noshow(db_path):
+    """Marca no-show e liberta o posto se o motorista nao fez check-in 30 min apos o inicio."""
+    import sqlite3, requests as req
+    agora = datetime.now()
+    c = sqlite3.connect(db_path)
+    # reservas confirmadas cujo inicio foi ha mais de 30 min (sem check-in)
+    rows = c.execute("""
+        SELECT id, driver_id, driver_nome, charger_nome, inicio
+        FROM reservas
+        WHERE estado='confirmada'
+        AND datetime(fim) < datetime('now','localtime')
+        AND id NOT IN (
+            SELECT reserva_id FROM ocpp_sessions
+            WHERE estado='ativa'
+        )
+    """).fetchall()
+    for rid, did, nome, posto, inicio in rows:
+        # marcar no-show
+        c.execute("UPDATE reservas SET estado='no_show' WHERE id=?", (rid,))
+        c.commit()
+        log.info(f"[NO-SHOW AUTO] {nome} · {posto} · {inicio} — reserva {rid} cancelada")
+        # notificar motorista
+        try:
+            import sqlite3 as _sq
+            tvde = _sq.connect("/opt/tvde/tvde_data.db")
+            row = tvde.execute("""
+                SELECT e.email, e.telefone FROM motoristas m
+                JOIN emails_motoristas e ON e.motorista_id = m.id
+                WHERE m.movvi_driver_id=? LIMIT 1""", (str(did),)).fetchone()
+            tvde.close()
+            phone = row[1] if row and row[1] else None
+            email = row[0] if row and row[0] else None
+            posto_curto = posto.split(" SN")[0] if posto else "Posto"
+            hora = inicio[11:16]
+            msg = (f"⚠️ Movvi Charge — Reserva cancelada\n\n"
+                   f"Ola {nome.split()[0]}!\n\n"
+                   f"A tua reserva no {posto_curto} para as {hora} foi cancelada "
+                   f"automaticamente por nao comparencia (30 min apos o inicio previsto).\n\n"
+                   f"Se precisares de carregar, podes fazer uma nova reserva em:\n"
+                   f"{BASE_URL}\n\n"
+                   f"— Movvi Charge · adelmo.pt")
+            if phone:
+                enviar_whatsapp(phone, msg)
+            if email:
+                enviar_email(email, f"⚠️ Reserva cancelada por nao comparencia — Movvi Charge", msg)
+        except Exception as e:
+            log.error(f"[NO-SHOW] erro notificacao: {e}")
+    c.close()
+
 def iniciar_monitor_alertas():
     """Chamar este função no servidor Flask para arrancar o monitor em background."""
     def _loop():
@@ -282,6 +382,7 @@ def iniciar_monitor_alertas():
         while True:
             try:
                 verificar_alertas(DB_PATH)
+                verificar_noshow(DB_PATH)
             except Exception as e:
                 log.error(f"[ALERTAS] erro: {e}")
             time.sleep(60)

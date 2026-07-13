@@ -21,7 +21,8 @@ API_KEY       = os.environ.get("CHARGE_API_KEY", "")
 
 PRECO_KWH     = 0.30
 CASA_ID       = 451775
-DB_PATH       = "/opt/tvde/tvde_data.db"
+DB_PATH       = "/opt/tvde/movvi_charge.db"
+CHARGE_DB     = "/opt/tvde/movvi_charge.db"
 APP_HTML      = "/opt/tvde/movvi-charge-app.html"
 CHECKIN_TTL   = 30 * 60   # 30 min para fazer check-in ou reserva cancela
 SESSAO_TTL    = 12 * 3600
@@ -69,7 +70,7 @@ def _limpar_sessoes():
 
 # ─── base de dados ────────────────────────────────────────────────────────────
 def db():
-    c = sqlite3.connect(DB_PATH)
+    c = sqlite3.connect(CHARGE_DB)
     c.execute("""CREATE TABLE IF NOT EXISTS debitos_carregamento(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         driver_id INTEGER, driver_nome TEXT, license_plate TEXT,
@@ -378,7 +379,7 @@ def api_minhas_reservas():
     c = db()
     cur = c.execute("""SELECT id, charger_nome, inicio, fim, duracao_min, estado
                        FROM reservas WHERE driver_id=? AND estado='confirmada'
-                       ORDER BY inicio DESC LIMIT 10""", (drv["driver_id"],))
+                       ORDER BY inicio ASC LIMIT 10""", (drv["driver_id"],))
     cols = [x[0] for x in cur.description]
     return jsonify([dict(zip(cols, r)) for r in cur.fetchall()])
 

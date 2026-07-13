@@ -588,7 +588,9 @@ h<19?"🌤 Boa tarde":
 $("heroLivres").textContent=
 chargers.filter(c=>c.online&&!c.charging).length;
 
-if(typeof minhasRes!="undefined" && minhasRes && minhasRes.length){
+let minhasRes=await api("/api/reservas").catch(()=>null);
+
+if(minhasRes && minhasRes.length){
     $("heroReserva").textContent=minhasRes[0].inicio.slice(11,16);
 }else{
     $("heroReserva").textContent="—";
@@ -692,8 +694,6 @@ ${btn}
           <div class="mono" style="font-weight:600;font-size:15px">${d.valor.toFixed(2)} €</div>
         </div>`).join(""):'<div class="note">Ainda sem carregamentos.</div>';
 
-      const minhasRes=await api("/api/reservas").catch(()=>null);
-
       if(minhasRes && minhasRes.length){
 
         const prox=minhasRes
@@ -708,7 +708,9 @@ ${btn}
         let estado="";
 
         if(diff>15){
-            estado=`⏳ Começa em ${diff} minutos`;
+            const horas=Math.floor(diff/60);
+        const mins=diff%60;
+        estado=horas>0?`⏳ Começa em ${horas}h ${mins}min`:`⏳ Começa em ${mins} minutos`;
         }else if(diff>=0){
             estado="🟢 Já pode iniciar o carregamento";
         }else{
@@ -900,7 +902,7 @@ function abrirModal(cid,cNome,hora="",data=""){
   const amanha=new Date(Date.now()+86400000).toISOString().slice(0,10);
   // se não passou data, perguntar qual dia
   if(!data){
-    const escolha=confirm("Reservar para HOJE?\nCancelar = Amanhã");
+    const escolha=confirm("Selecione:\n\n✅ OK → Reservar para HOJE\n❌ Cancelar → Reservar para AMANHÃ");
     data=escolha?hoje:amanha;
   }
   modalCharger={id:cid,nome:cNome,data:data};
