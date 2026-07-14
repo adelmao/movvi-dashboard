@@ -55,6 +55,18 @@ def _auth():
         g.perfil = "admin"; g.driver = None; return None
     tok = request.headers.get("X-Driver-Token", "")
     _limpar_sessoes()
+    if tok and tok not in SESSOES:
+        # recuperar da BD
+        try:
+            _c = db()
+            row = _c.execute(
+                "SELECT driver_id, driver_nome, license_plate, model FROM sessoes WHERE token=?",
+                (tok,)).fetchone()
+            if row:
+                SESSOES[tok] = {"driver_id": row[0], "name": row[1],
+                                "license_plate": row[2], "model": row[3],
+                                "exp": time.time() + SESSAO_TTL}
+        except: pass
     if tok in SESSOES:
         g.perfil = "driver"; g.driver = SESSOES[tok]
         ok = request.path in ("/api/chargers", "/api/my") \
@@ -87,6 +99,13 @@ def db():
         estado TEXT DEFAULT 'confirmada',
         criado_em TEXT DEFAULT CURRENT_TIMESTAMP)""")
     # migrações seguras
+    c.execute("""CREATE TABLE IF NOT EXISTS sessoes(
+        token TEXT PRIMARY KEY,
+        driver_id INTEGER,
+        driver_nome TEXT,
+        license_plate TEXT,
+        model TEXT,
+        criado_em TEXT DEFAULT CURRENT_TIMESTAMP)""")
     c.execute("""CREATE TABLE IF NOT EXISTS cancel_tokens(
         token TEXT PRIMARY KEY,
         reserva_id INTEGER,
@@ -130,7 +149,7 @@ def wb_chargers():
 # ─── Movvi (GesTVDE) ─────────────────────────────────────────────────────────
 _mv = {"tok": None}
 
-def mv_login(email, password):
+def mv_login(email, password, ua=None):
     r = requests.post(f"{MOVVI_API}/login",
                       json={"email": email, "password": password},
                       headers=MV_H, timeout=20)
@@ -255,13 +274,47 @@ def driver_login():
         return jsonify({"erro": "Não tens viatura ativa atribuída hoje. Fala com a gestão."}), 403
     tok = secrets.token_hex(24)
     SESSOES[tok] = {**info, "exp": time.time() + SESSAO_TTL}
+    # persistir na BD
+    try:
+        _c = db()
+        _c.execute("INSERT OR REPLACE INTO sessoes(token,driver_id,driver_nome,license_plate,model) VALUES(?,?,?,?,?)",
+                   (tok, info["driver_id"], info["name"], info["license_plate"], info.get("model","")))
+        _c.commit()
+    except Exception as _e:
+        print(f"[sessoes] erro ao persistir: {_e}")
     return jsonify({"token": tok, **info})
 
 @app.get("/api/chargers")
 def api_chargers():
+    OCPP_MAP = {"MOVVI1": 1352015, "MOVVI3": 809604, "MOVVI4": 519075}
     try:
         chars = wb_chargers()
-        # enriquecer com sessão ativa (quem está a carregar)
+        # sincronizar SESSOES_ATIVAS com sessoes OCPP activas
+        try:
+            import requests as _r
+            ocpp = _r.get("http://localhost:9001/ocpp/status", timeout=3).json()
+            for ocpp_id, v in ocpp.get("chargers", {}).items():
+                wb_id = OCPP_MAP.get(ocpp_id)
+                if not wb_id: continue
+                nome = v.get("driver_nome","")
+                did = v.get("driver_id") or 0
+                # se tem nome mas nao tem driver_id, buscar na BD
+                if nome and not did:
+                    try:
+                        _c = db()
+                        row = _c.execute(
+                            "SELECT movvi_driver_id FROM motoristas_contactos WHERE nome=? LIMIT 1",
+                            (nome,)).fetchone()
+                        if row: did = int(row[0])
+                    except: pass
+                if nome and wb_id not in SESSOES_ATIVAS:
+                    SESSOES_ATIVAS[wb_id] = {
+                        "driver_id": did,
+                        "name": nome,
+                        "license_plate": v.get("license_plate","")
+                    }
+        except: pass
+        # enriquecer com sessão ativa
         for c in chars:
             sess = SESSOES_ATIVAS.get(c["id"])
             c["sessao_driver_id"] = sess["driver_id"] if sess else None
@@ -437,10 +490,11 @@ def cancelar_reserva(rid):
 def checkin(rid):
     drv = g.driver
     c = db()
-    r = c.execute("SELECT * FROM reservas WHERE id=? AND driver_id=? AND estado='confirmada'",
-                  (rid, drv["driver_id"])).fetchone()
+    cur = c.execute("SELECT * FROM reservas WHERE id=? AND driver_id=? AND estado='confirmada'",
+                  (rid, drv["driver_id"]))
+    r = cur.fetchone()
     if not r: return jsonify({"erro": "Reserva não encontrada ou já usada."}), 404
-    cols = [x[0] for x in c.description]
+    cols = [x[0] for x in cur.description]
     res = dict(zip(cols, r))
     # registar sessão ativa
     SESSOES_ATIVAS[res["charger_id"]] = {

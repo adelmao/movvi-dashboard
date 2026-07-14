@@ -135,7 +135,9 @@ async def handle_message(charger_id, ws, raw):
                     trans_id = ch.get("transaction_id")
                     if trans_id:
                         kwh_fim = ch.get("kwh_atual", ch.get("kwh_inicio", 0))
-                        kwh = kwh_fim - ch.get("kwh_inicio", 0)
+                        kwh_ini = ch.get("kwh_inicio", 0)
+                        kwh = round(kwh_fim - kwh_ini, 3) if kwh_fim > kwh_ini else 0
+                        if kwh > 200: kwh = round(kwh / 1000, 3)
                         gravar_debito(
                             ch.get("driver_id", 0), ch.get("driver_nome", "Desconhecido"),
                             ch.get("license_plate", ""), charger_id, kwh)
@@ -163,14 +165,16 @@ async def handle_message(charger_id, ws, raw):
                             wb_id = cinfo.get("wallbox_id")
                     # buscar reserva activa para este posto
                     c = db()
-                    # buscar reserva activa agora (inicio <= agora <= fim)
+                    # buscar reserva activa agora ou nos proximos 30 min
                     agora_str = agora.strftime("%Y-%m-%dT%H:%M:%S")
+                    from datetime import timedelta
+                    antecipado = (agora + timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%S")
                     row = c.execute("""SELECT id, driver_id, driver_nome, license_plate, charger_id
                         FROM reservas
                         WHERE estado IN ('confirmada','checkin')
                         AND inicio <= ? AND fim >= ?
                         ORDER BY inicio ASC LIMIT 1""",
-                        (agora_str, agora_str)).fetchone()
+                        (antecipado, agora_str)).fetchone()
                     if row:
                         rid, did, dnome, plate, cid_num = row
                         ch = CHARGERS.setdefault(charger_id, {})
@@ -180,6 +184,19 @@ async def handle_message(charger_id, ws, raw):
                         c.execute("UPDATE reservas SET estado='checkin' WHERE id=?", (rid,))
                         c.commit()
                         log.info(f"[AUTO CHECK-IN] {charger_id} → {dnome} reserva={rid}")
+                        # enviar RemoteStartTransaction via HTTP interno
+                        import threading
+                        def _start():
+                            import requests as _req, time as _t
+                            _t.sleep(1)  # aguardar estabilização
+                            _req.post("http://localhost:9001/ocpp/start",
+                                json={"charger_id": charger_id,
+                                      "driver_id": did,
+                                      "driver_nome": dnome,
+                                      "license_plate": row[3] or "",
+                                      "id_tag": "MOVVI"},
+                                timeout=10)
+                        threading.Thread(target=_start, daemon=True).start()
                 except Exception as e:
                     log.error(f"[AUTO CHECK-IN] erro: {e}")
             await ws.send(json.dumps([3, uid, {}]))
@@ -219,7 +236,9 @@ async def handle_message(charger_id, ws, raw):
             reason = payload.get("reason", "")
             cid = TRANS.pop(trans_id, charger_id)
             ch = CHARGERS.get(cid, {})
-            kwh = kwh_fim - ch.get("kwh_inicio", 0)
+            kwh_ini = ch.get("kwh_inicio", 0)
+            kwh = round(kwh_fim - kwh_ini, 3) if kwh_fim > kwh_ini else round(kwh_fim / 1000, 3)
+            if kwh > 200: kwh = round(kwh / 1000, 3)  # converter Wh para kWh se necessário
             # débito automático
             valor = gravar_debito(
                 ch.get("driver_id", 0), ch.get("driver_nome", "Desconhecido"),
@@ -236,6 +255,17 @@ async def handle_message(charger_id, ws, raw):
             log.info(f"[STOP] trans={trans_id} kwh={kwh:.2f} valor={valor:.2f}€ motivo={reason}")
 
         elif action == "MeterValues":
+            # actualizar kwh_atual na BD para persistência
+            try:
+                cid_m = TRANS.get(payload.get("transactionId"), charger_id)
+                ch_m = CHARGERS.get(cid_m, {})
+                if ch_m.get("kwh_atual"):
+                    c_db = db()
+                    c_db.execute("UPDATE ocpp_sessions SET kwh_fim=? WHERE transaction_id=? AND estado='ativa'",
+                                (ch_m["kwh_atual"], payload.get("transactionId")))
+                    c_db.commit()
+                    c_db.close()
+            except: pass
             trans_id = payload.get("transactionId")
             for sv in payload.get("meterValue", []):
                 for sv2 in sv.get("sampledValue", []):
@@ -360,6 +390,28 @@ async def http_api(reader, writer):
         log.error(f"[HTTP API] {e}")
     finally:
         writer.close()
+
+
+def recuperar_sessoes():
+    """Ao arrancar, recupera sessões OCPP activas da BD para memória."""
+    try:
+        c = db()
+        rows = c.execute("""SELECT charger_ocpp_id, transaction_id, driver_id, 
+                           driver_nome, license_plate, kwh_inicio
+                           FROM ocpp_sessions WHERE estado='ativa'""").fetchall()
+        for charger_ocpp_id, trans_id, did, dnome, plate, kwh_ini in rows:
+            ch = CHARGERS.setdefault(charger_ocpp_id, {})
+            ch["transaction_id"] = trans_id
+            ch["driver_id"] = did
+            ch["driver_nome"] = dnome
+            ch["license_plate"] = plate or ""
+            ch["kwh_inicio"] = kwh_ini or 0
+            ch["kwh_atual"] = kwh_ini or 0
+            if trans_id: TRANS[trans_id] = charger_ocpp_id
+            log.info(f"[RECOVER] sessao recuperada: {charger_ocpp_id} trans={trans_id} {dnome}")
+        c.close()
+    except Exception as e:
+        log.error(f"[RECOVER] erro: {e}")
 
 async def main():
     log.info(f"Movvi OCPP Server a arrancar...")

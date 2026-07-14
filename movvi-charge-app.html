@@ -311,7 +311,7 @@ MOVVI Charge
     </div>
     <div class="panel">
       <div class="ph"><h2>Reservar posto</h2><span class="sub" id="dataHoje"></span></div>
-      <div id="calWrapper">A carregar…</div>
+      <div id="calWrapper" style="max-height:65vh;overflow-y:auto;scroll-behavior:smooth">A carregar…</div>
     </div>
     <div class="panel">
       <div class="ph"><h2>Próxima reserva</h2></div>
@@ -708,9 +708,7 @@ ${btn}
         let estado="";
 
         if(diff>15){
-            const horas=Math.floor(diff/60);
-        const mins=diff%60;
-        estado=horas>0?`⏳ Começa em ${horas}h ${mins}min`:`⏳ Começa em ${mins} minutos`;
+            estado=`⏳ Começa em ${diff} minutos`;
         }else if(diff>=0){
             estado="🟢 Já pode iniciar o carregamento";
         }else{
@@ -739,10 +737,8 @@ ${btn}
             <div class="nm">${(r.charger_nome||"").split(" SN")[0]}</div>
             <div class="det">${r.inicio.slice(11,16)} – ${r.fim.slice(11,16)} · ${r.duracao_min} min</div>
           </div>
-          <div style="display:flex;gap:6px">
-            <button class="btn blue sm" onclick="checkin(${r.id})">Check-in</button>
-            <button class="btn stop sm" onclick="cancelarRes(${r.id})">Cancelar</button>
-          </div>
+          <button class="btn blue sm" onclick="checkin(${r.id})">Check-in</button>
+          <button class="btn stop sm" onclick="cancelarRes(${r.id})">Cancelar</button>
         </div>`).join(""):'<div class="note">Sem reservas ativas.</div>';
     }
     await carregarCalendario(chargers);
@@ -789,8 +785,10 @@ async function carregarCalendario(chargers){
     try{chargers=await api("/api/chargers");}catch{return;}
   }
   const agora=new Date();
-  const hoje=agora.toISOString().slice(0,10);
-  const amanha=new Date(agora.getTime()+86400000).toISOString().slice(0,10);
+  const _pad=n=>String(n).padStart(2,"0");
+  const hoje=`${agora.getFullYear()}-${_pad(agora.getMonth()+1)}-${_pad(agora.getDate())}`;
+  const _am=new Date(agora); _am.setDate(_am.getDate()+1);
+  const amanha=`${_am.getFullYear()}-${_pad(_am.getMonth()+1)}-${_pad(_am.getDate())}`;
   const [sH,sA]=await Promise.all([
     fetch("/api/slots?data="+hoje,{headers:H()}).then(r=>r.json()).catch(()=>[]),
     fetch("/api/slots?data="+amanha,{headers:H()}).then(r=>r.json()).catch(()=>[])
@@ -824,13 +822,22 @@ async function carregarCalendario(chargers){
     });
     if(!temSlots) linhas=`<div style="text-align:center;color:var(--sub);font-size:12px;padding:12px">Sem slots disponíveis.</div>`;
     return `<div style="margin-bottom:14px">
-      <div style="font:700 13px 'Archivo';padding:10px 0 6px;border-bottom:2px solid var(--ink);margin-bottom:6px;text-transform:capitalize">${label} · ${titulo}</div>
+      <div style="font:700 13px 'Archivo';padding:10px 0 6px;border-bottom:2px solid var(--ink);margin-bottom:6px;text-transform:capitalize;position:sticky;top:0;background:var(--bg);z-index:10">${label} · ${titulo}</div>
       <div class="cal-header" style="grid-template-columns:${cols}"><span></span>${chargers.map(c=>`<span>${hLabel(c)}</span>`).join("")}</div>
       ${linhas}
     </div>`;
   }
 
   $("calWrapper").innerHTML=buildDia("Hoje",hoje,sH,true)+buildDia("Amanhã",amanha,sA,false);
+  if(!window._calScrollFeito){
+    window._calScrollFeito=true;
+    setTimeout(()=>{
+      const agr=new Date();
+      const hAtual=String(agr.getHours()).padStart(2,"0")+":"+String(agr.getMinutes()<30?"00":"30");
+      const el=Array.from($("calWrapper").querySelectorAll(".cal-hora")).find(e=>e.textContent>=hAtual);
+      if(el) el.scrollIntoView({block:"center",behavior:"smooth"});
+    },100);
+  }
 }
 
 let _filtroRes="hoje";
@@ -898,8 +905,11 @@ async function carregarDebitos(){
 }
 
 function abrirModal(cid,cNome,hora="",data=""){
-  const hoje=new Date().toISOString().slice(0,10);
-  const amanha=new Date(Date.now()+86400000).toISOString().slice(0,10);
+  const agora2=new Date();
+  const pad=n=>String(n).padStart(2,"0");
+  const hoje=`${agora2.getFullYear()}-${pad(agora2.getMonth()+1)}-${pad(agora2.getDate())}`;
+  const am=new Date(agora2); am.setDate(am.getDate()+1);
+  const amanha=`${am.getFullYear()}-${pad(am.getMonth()+1)}-${pad(am.getDate())}`;
   // se não passou data, perguntar qual dia
   if(!data){
     const escolha=confirm("Selecione:\n\n✅ OK → Reservar para HOJE\n❌ Cancelar → Reservar para AMANHÃ");
