@@ -194,6 +194,13 @@ td{padding:8px 6px;border-bottom:1px solid #EDF1EF}
 .hidden{display:none}
 @media(max-width:520px){.kpis{grid-template-columns:1fr 1fr}.miio .kwh-big{font-size:40px}.miio .stats{grid-template-columns:1fr 1fr}}
 </style>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#1a5c38">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="48x48" href="/icons/favicon-48.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Movvi Charge">
 </head>
 <body>
 <div class="top">
@@ -528,32 +535,84 @@ function tempoDecorrido(inicioTs){
 }
 
 function renderMIIO(c){
-  if(!SESSAO_INICIO) SESSAO_INICIO=Date.now()-(c.sessionKwh/c.kwNow)*3600000||Date.now();
+  if(!SESSAO_INICIO) SESSAO_INICIO=Date.now()-(c.sessionKwh&&c.kwNow?(c.sessionKwh/c.kwNow)*3600000:0)||Date.now();
   const painel=$("miioPanel");
   painel.classList.remove("hidden");
+  const kwh = c.sessionKwh||0;
+  const eur = (kwh*PRECO).toFixed(2);
+  const kw  = c.kwNow?c.kwNow.toFixed(1):"0.0";
+  const tempo = tempoDecorrido(SESSAO_INICIO);
+  const elapsed = (Date.now()-SESSAO_INICIO)/1000;
+  const mins = (elapsed/60)%60;
+  const secs = elapsed%60;
+  const ma = (mins/60*360-90)*Math.PI/180;
+  const sa = (secs/60*360-90)*Math.PI/180;
+  const arcPct = (elapsed/3600)%1;
+
   painel.innerHTML=`
   <div class="miio">
     <div class="posto-tag"><span class="pulse"></span>${c.name.split(" SN")[0].toUpperCase()} · A CARREGAR</div>
-    <div class="kwh-big">${c.sessionKwh.toFixed(2)}<span>kWh</span></div>
-    <div class="eur-big">${(c.sessionKwh*PRECO).toFixed(2)} €</div>
+
+    <!-- kWh grande no centro -->
+    <div class="kwh-big">${kwh.toFixed(2)}<span>kWh</span></div>
+    <div class="eur-big">${eur} €</div>
+
+    <!-- stats em linha -->
     <div class="stats">
-      <div><div class="stat-l">⚡ Potência</div><div class="stat-v kw">${c.kwNow.toFixed(1)} kW</div></div>
-      <div><div class="stat-l">⏱ Tempo</div><div class="stat-v time" id="clockDisplay">${tempoDecorrido(SESSAO_INICIO)}</div></div>
-      <div><div class="stat-l">💰 €/kWh</div><div class="stat-v">${PRECO.toFixed(2)}</div></div>
+      <div>
+        <div class="stat-l">⚡ Potência</div>
+        <div class="stat-v kw">${kw} kW</div>
+      </div>
+      <div>
+        <div class="stat-l">⏱ Tempo</div>
+        <div class="stat-v">
+          <svg id="clockSvg" width="80" height="80" viewBox="0 0 120 120" style="display:block;margin:4px auto 2px">
+            <circle cx="60" cy="60" r="54" fill="none" stroke="#EFF1F0" stroke-width="6"/>
+            <circle cx="60" cy="60" r="54" fill="none" stroke="#146B3A" stroke-width="6"
+              stroke-dasharray="${Math.round(339*arcPct)} 339"
+              stroke-dashoffset="84.75" stroke-linecap="round"
+              transform="rotate(-90 60 60)"/>
+            ${[0,1,2,3,4,5,6,7,8,9,10,11].map(i=>{
+              const a=(i*30-90)*Math.PI/180;
+              const r1=46,r2=i%3===0?40:43;
+              return `<line x1="${60+r1*Math.cos(a)}" y1="${60+r1*Math.sin(a)}" x2="${60+r2*Math.cos(a)}" y2="${60+r2*Math.sin(a)}" stroke="#C4C9C7" stroke-width="${i%3===0?2:1}"/>`;
+            }).join('')}
+            <line x1="60" y1="60" x2="${60+38*Math.cos(ma)}" y2="${60+38*Math.sin(ma)}" stroke="#101312" stroke-width="3" stroke-linecap="round"/>
+            <line x1="60" y1="60" x2="${60+48*Math.cos(sa)}" y2="${60+48*Math.sin(sa)}" stroke="#146B3A" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="60" cy="60" r="4" fill="#146B3A"/>
+          </svg>
+          <span id="clockDisplay" style="font:700 13px 'IBM Plex Mono';color:var(--ink)">${tempo}</span>
+        </div>
+      </div>
+      <div>
+        <div class="stat-l">💰 €/kWh</div>
+        <div class="stat-v">${PRECO.toFixed(2)}</div>
+      </div>
     </div>
-    <div class="barra"><i></i></div>
+
+    <div class="barra"><i style="width:${Math.min(kw/22*100,100)}%"></i></div>
     <div class="info-row">
       <span>Matrícula: ${EU&&EU.license_plate||"—"}</span>
-      <span>Posto: ${c.id}</span>
+      <span>Posto: ${c.name.split(" SN")[0]}</span>
     </div>
     <button class="btn-stop" onclick="fechar(${c.id})">⏹ Terminar e debitar</button>
   </div>`;
-  // relógio a contar ao segundo
+
   clearInterval(clockTimer);
   clockTimer=setInterval(()=>{
-    const el=$("clockDisplay");
-    if(el) el.textContent=tempoDecorrido(SESSAO_INICIO);
-    else clearInterval(clockTimer);
+    const el=document.getElementById("clockDisplay");
+    const svg=document.getElementById("clockSvg");
+    if(!el||!svg){clearInterval(clockTimer);return;}
+    el.textContent=tempoDecorrido(SESSAO_INICIO);
+    const e2=(Date.now()-SESSAO_INICIO)/1000;
+    const m2=(e2/60)%60, s2=e2%60;
+    const ma2=(m2/60*360-90)*Math.PI/180;
+    const sa2=(s2/60*360-90)*Math.PI/180;
+    const lines=svg.querySelectorAll("line");
+    if(lines[12]){lines[12].setAttribute("x2",60+38*Math.cos(ma2));lines[12].setAttribute("y2",60+38*Math.sin(ma2));}
+    if(lines[13]){lines[13].setAttribute("x2",60+48*Math.cos(sa2));lines[13].setAttribute("y2",60+48*Math.sin(sa2));}
+    const arc=svg.querySelector("circle[stroke-dasharray]");
+    if(arc){const p2=(e2/3600)%1;arc.setAttribute("stroke-dasharray",Math.round(339*p2)+" 339");}
   },1000);
 }
 
@@ -1005,6 +1064,9 @@ function exportarCSV(){
 
 if(PERFIL==="admin"&&KEY) entrar();
 else if(PERFIL==="driver"&&DTOKEN) entrar();
+</script>
+<script>
+if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw.js"); }
 </script>
 </body>
 </html>

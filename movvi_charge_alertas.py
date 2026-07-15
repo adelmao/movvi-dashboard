@@ -332,16 +332,41 @@ def verificar_noshow(db_path):
     agora = datetime.now()
     c = sqlite3.connect(db_path)
     # reservas confirmadas cujo inicio foi ha mais de 30 min (sem check-in)
+    # v1.4.3 — no-show aos 30 min do INICIO; posto nao fica bloqueado
     rows = c.execute("""
         SELECT id, driver_id, driver_nome, charger_nome, inicio
         FROM reservas
         WHERE estado='confirmada'
-        AND datetime(fim) < datetime('now','localtime')
-        AND id NOT IN (
-            SELECT reserva_id FROM ocpp_sessions
+        AND datetime(inicio, '+30 minutes') < datetime('now','localtime')
+        AND driver_id NOT IN (
+            SELECT driver_id FROM ocpp_sessions
             WHERE estado='ativa'
         )
     """).fetchall()
+
+    # v1.4.6 — expiradas: checkin cujo fim passou ha +15 min sem sessao ativa -> concluir
+    c.execute("""UPDATE reservas SET estado='concluida'
+        WHERE estado='checkin'
+        AND datetime(fim, '+15 minutes') < datetime('now','localtime')
+        AND driver_id NOT IN (SELECT driver_id FROM ocpp_sessions WHERE estado='ativa')""")
+    c.commit()
+
+    # v1.4.3 — perdao ±2h: se o motorista iniciou sessao em QUALQUER posto
+    # entre 2h ANTES e 2h DEPOIS do inicio da reserva, anula o no-show
+    perdoados = c.execute("""
+        SELECT r.id, r.driver_nome FROM reservas r
+        WHERE r.estado='no_show'
+        AND EXISTS (
+            SELECT 1 FROM ocpp_sessions o
+            WHERE o.driver_id = r.driver_id
+            AND datetime(o.inicio) >= datetime(r.inicio, '-2 hours')
+            AND datetime(o.inicio) <= datetime(r.inicio, '+2 hours')
+        )
+    """).fetchall()
+    for pid, pnome in perdoados:
+        c.execute("UPDATE reservas SET estado='checkin_tardio' WHERE id=?", (pid,))
+        c.commit()
+        log.info(f"[NO-SHOW ANULADO] {pnome} carregou dentro da janela ±2h — reserva {pid} -> checkin_tardio")
     for rid, did, nome, posto, inicio in rows:
         # marcar no-show
         c.execute("UPDATE reservas SET estado='no_show' WHERE id=?", (rid,))

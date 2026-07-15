@@ -174,8 +174,11 @@ def mv_get(path, params=None, token=None):
     return r.json()
 
 _ativos_cache = {"data": [], "exp": 0}
-def ativos():
-    if time.time() < _ativos_cache["exp"]: return _ativos_cache["data"]
+def ativos(force_refresh=False):
+    # v1.4.4 — force_refresh ignora o cache (usado no login quando o
+    # motorista acabou de ser atribuido a uma viatura no portal)
+    if not force_refresh and time.time() < _ativos_cache["exp"]:
+        return _ativos_cache["data"]
     hoje = time.strftime("%Y-%m-%d")
     d = mv_get("/v1/vehicle-usages", {"active_on": hoje, "per_page": 100})
     out, vistos = [], set()
@@ -201,6 +204,15 @@ def _gravar_debito(driver_id, nome, matricula, charger_id, charger_nome, kwh, au
     valor = round(kwh * PRECO_KWH, 2)
     semana = time.strftime("%G-W%V")
     c = db()
+    # v1.4.2 — anti-duplicado: OCPP é a fonte primária; só grava se o OCPP
+    # ainda não registou débito equivalente (mesmo motorista, kWh ±0.5, últimas 6h)
+    dup = c.execute("""SELECT id FROM debitos_carregamento
+        WHERE driver_id=? AND ABS(kwh-?)<0.5
+        AND criado_em > datetime('now','localtime','-6 hours')""",
+        (driver_id, kwh)).fetchone()
+    if dup:
+        print(f"[DEBITO] ignorado (duplicado do OCPP id={dup[0]}): {nome} {kwh:.2f} kWh")
+        return 0
     c.execute("""INSERT INTO debitos_carregamento
         (driver_id, driver_nome, license_plate, charger_id, charger_nome,
          kwh, preco_kwh, valor, fim, semana, auto)
@@ -264,6 +276,8 @@ def driver_login():
                 ((x.get("user") or {}).get("email") or "").strip().lower() == email), None)
             if meu:
                 atv = next((a for a in ativos() if a["driver_id"] == meu["id"]), None)
+                if not atv:
+                    atv = next((a for a in ativos(force_refresh=True) if a["driver_id"] == meu["id"]), None)
                 info = {"driver_id": meu["id"], "name": meu["name"],
                         "license_plate": (atv or {}).get("license_plate", ""),
                         "model": (atv or {}).get("model", "")}
@@ -271,7 +285,13 @@ def driver_login():
     if not info or not info.get("driver_id"):
         return jsonify({"erro": "Login válido, mas não encontrei o teu registo no Movvi. Fala com a gestão."}), 403
     if not any(a["driver_id"] == info["driver_id"] for a in ativos()):
-        return jsonify({"erro": "Não tens viatura ativa atribuída hoje. Fala com a gestão."}), 403
+        # v1.4.4 — motorista pode ter sido atribuido ha minutos; refrescar cache e tentar de novo
+        atv2 = next((a for a in ativos(force_refresh=True) if a["driver_id"] == info["driver_id"]), None)
+        if not atv2:
+            return jsonify({"erro": "Não tens viatura ativa atribuída hoje. Fala com a gestão."}), 403
+        if not info.get("license_plate"):
+            info["license_plate"] = atv2.get("license_plate", "")
+            info["model"] = atv2.get("model", "")
     tok = secrets.token_hex(24)
     SESSOES[tok] = {**info, "exp": time.time() + SESSAO_TTL}
     # persistir na BD

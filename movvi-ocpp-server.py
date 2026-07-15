@@ -146,6 +146,19 @@ async def handle_message(charger_id, ws, raw):
                             fim=datetime('now','localtime'), estado='concluida'
                             WHERE transaction_id=?""", (kwh_fim, trans_id))
                         c.commit()
+                        # v1.4.6 — cabo removido: concluir a reserva do driver neste posto
+                        try:
+                            c.execute("""UPDATE reservas SET estado='concluida'
+                                WHERE estado IN ('checkin','confirmada')
+                                AND driver_id = ?
+                                AND REPLACE(SUBSTR(charger_nome, 1, INSTR(charger_nome||'(', '(')-1), ' ', '') = ?
+                                AND datetime(inicio) <= datetime('now','localtime','+2 hours')""",
+                                (ch.get("driver_id", 0), charger_id))
+                            c.commit()
+                            if c.total_changes:
+                                log.info(f"[RESERVA CONCLUIDA] {charger_id} → {ch.get('driver_nome','')} (posto libertado)")
+                        except Exception as _e:
+                            log.error(f"[RESERVA CONCLUIDA] erro: {_e}")
                         for k in ["transaction_id","kwh_inicio","kwh_atual","driver_id","driver_nome","license_plate"]:
                             ch.pop(k, None)
                         TRANS.pop(trans_id, None)
@@ -165,16 +178,19 @@ async def handle_message(charger_id, ws, raw):
                             wb_id = cinfo.get("wallbox_id")
                     # buscar reserva activa para este posto
                     c = db()
-                    # buscar reserva activa agora ou nos proximos 30 min
+                    # janela: 2h antes do inicio ate 2h depois do fim
                     agora_str = agora.strftime("%Y-%m-%dT%H:%M:%S")
                     from datetime import timedelta
-                    antecipado = (agora + timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%S")
+                    antecipado = (agora + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S")
+                    prorrogado = (agora - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S")
+                    # v1.4.5 — FILTRAR PELO POSTO: 'MOVVI 3 (Interna Branca)' -> 'MOVVI3'
                     row = c.execute("""SELECT id, driver_id, driver_nome, license_plate, charger_id
                         FROM reservas
                         WHERE estado IN ('confirmada','checkin')
+                        AND REPLACE(SUBSTR(charger_nome, 1, INSTR(charger_nome||'(', '(')-1), ' ', '') = ?
                         AND inicio <= ? AND fim >= ?
                         ORDER BY inicio ASC LIMIT 1""",
-                        (antecipado, agora_str)).fetchone()
+                        (charger_id, antecipado, prorrogado)).fetchone()
                     if row:
                         rid, did, dnome, plate, cid_num = row
                         ch = CHARGERS.setdefault(charger_id, {})
